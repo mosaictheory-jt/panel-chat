@@ -4,7 +4,7 @@ Chat with AI agents representing 1,136 real survey respondents. Ask a question, 
 
 ## Features
 
-- **Multi-provider LLM support**: Anthropic (Claude), OpenAI (GPT-4o), Google (Gemini) — bring your own API key
+- **Multi-provider LLM support**: Anthropic (Claude), OpenAI (GPT-5.2, o3), Google (Gemini) — bring your own API key
 - **Survey-backed personas**: Each agent is grounded in a real respondent's profile from the 2026 Data Engineering Survey
 - **Multi-round debates**: Agents see prior responses and can refine their positions
 - **Configurable panels**: 2 to 1,136 respondents, filtered by role, industry, region, and more
@@ -52,7 +52,7 @@ Settings are managed in the browser (no server-side API keys):
 | Setting | Description |
 |---------|------------|
 | **API Key** | Your key for the selected provider (stored in localStorage, sent directly to the provider) |
-| **Model** | Claude Sonnet 4, Claude Haiku 4.5, GPT-4o, GPT-4o Mini, Gemini 2.0 Flash, Gemini 2.5 Pro |
+| **Model** | Claude Opus 4.6, Claude Sonnet 4.5, Claude Haiku 4.5, GPT-5.2, GPT-4.1, GPT-4.1 Mini, o3, o3 Mini, Gemini 2.5 Pro, Gemini 2.5 Flash |
 | **Panel Size** | Number of respondents (2–1,136). Panels >20 show a cost/speed warning |
 | **Rounds** | Number of debate rounds (1–5) |
 | **Filters** | Narrow the panel by role, org size, industry, region, AI usage, architecture trend |

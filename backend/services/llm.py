@@ -4,7 +4,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 def _detect_provider(model: str) -> str:
     if model.startswith("claude"):
         return "anthropic"
-    if model.startswith("gpt") or model.startswith("o1") or model.startswith("o3"):
+    if model.startswith(("gpt", "o1", "o3", "o4")):
         return "openai"
     if model.startswith("gemini"):
         return "google"

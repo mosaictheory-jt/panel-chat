@@ -79,10 +79,14 @@ export interface DebateSettings {
 }
 
 export const MODEL_OPTIONS = [
-  { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4", provider: "Anthropic" },
+  { value: "claude-opus-4-6", label: "Claude Opus 4.6", provider: "Anthropic" },
+  { value: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5", provider: "Anthropic" },
   { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", provider: "Anthropic" },
-  { value: "gpt-4o", label: "GPT-4o", provider: "OpenAI" },
-  { value: "gpt-4o-mini", label: "GPT-4o Mini", provider: "OpenAI" },
-  { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash", provider: "Google" },
+  { value: "gpt-5.2", label: "GPT-5.2", provider: "OpenAI" },
+  { value: "gpt-4.1", label: "GPT-4.1", provider: "OpenAI" },
+  { value: "gpt-4.1-mini", label: "GPT-4.1 Mini", provider: "OpenAI" },
+  { value: "o3", label: "o3", provider: "OpenAI" },
+  { value: "o3-mini", label: "o3 Mini", provider: "OpenAI" },
   { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "Google" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "Google" },
 ] as const

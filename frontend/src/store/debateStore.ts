@@ -55,7 +55,7 @@ interface DebateState {
 export const useDebateStore = create<DebateState>((set, get) => ({
   panelSize: 5,
   numRounds: 2,
-  model: localStorage.getItem(STORAGE_KEY_MODEL) || "claude-sonnet-4-20250514",
+  model: localStorage.getItem(STORAGE_KEY_MODEL) || "claude-sonnet-4-5-20250929",
   apiKey: localStorage.getItem(STORAGE_KEY_API_KEY) || "",
   settingsOpen: !localStorage.getItem(STORAGE_KEY_API_KEY),
   setPanelSize: (size) => set({ panelSize: size }),
