@@ -1,0 +1,20 @@
+[project]
+name = "panel-chat"
+version = "0.1.0"
+description = "Chat with AI agents representing survey respondents"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "websockets>=14.0",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "duckdb>=1.2",
+    "langgraph>=0.2",
+    "langchain-anthropic>=0.3",
+    "langchain-openai>=0.3",
+    "langchain-core>=0.3",
+    "python-dotenv>=1.0",
+    "httpx>=0.28",
+]
