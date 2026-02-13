@@ -19,21 +19,18 @@ def get_llm(model: str, api_key: str) -> BaseChatModel:
         return ChatAnthropic(
             model=model,
             api_key=api_key,
-            max_tokens=1024,
         )
     elif provider == "openai":
         from langchain_openai import ChatOpenAI
         return ChatOpenAI(
             model=model,
             api_key=api_key,
-            max_tokens=1024,
         )
     elif provider == "google":
         from langchain_google_genai import ChatGoogleGenerativeAI
         return ChatGoogleGenerativeAI(
             model=model,
             google_api_key=api_key,
-            max_output_tokens=1024,
         )
     else:
         raise ValueError(f"Unknown provider: {provider}")

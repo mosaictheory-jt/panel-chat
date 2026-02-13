@@ -1,15 +1,68 @@
+import json
+import logging
+
 from langchain_core.messages import SystemMessage, HumanMessage
-from backend.graph.state import AgentState, DebateState
-from backend.graph.prompts import PERSONA_SYSTEM, ROUND_1_USER, ROUND_N_USER
+from backend.graph.state import SurveyAgentState
+from backend.graph.prompts import PERSONA_SYSTEM, SURVEY_USER
 from backend.services.llm import get_llm
 
+logger = logging.getLogger(__name__)
 
-def agent_respond(state: AgentState) -> dict:
+
+def _format_sub_questions(sub_questions: list[dict]) -> str:
+    """Format sub-questions into a readable text block for the LLM prompt."""
+    lines = []
+    for sq in sub_questions:
+        options_str = ", ".join(f'"{opt}"' for opt in sq["answer_options"])
+        lines.append(f'- {sq["id"]}: {sq["text"]}\n  Options: [{options_str}]')
+    return "\n".join(lines)
+
+
+def _parse_answers(content: str, sub_questions: list[dict]) -> dict[str, str]:
+    """Extract the JSON answer dict from LLM response, with fallback parsing."""
+    text = content.strip()
+    # Strip markdown code fences if present
+    if text.startswith("```"):
+        lines = text.split("\n")
+        lines = [line for line in lines if not line.strip().startswith("```")]
+        text = "\n".join(lines).strip()
+
+    try:
+        answers = json.loads(text)
+    except json.JSONDecodeError:
+        # Try to find JSON object in the response
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1:
+            try:
+                answers = json.loads(text[start:end + 1])
+            except json.JSONDecodeError:
+                logger.warning("Failed to parse LLM response as JSON: %s", text[:200])
+                # Fallback: return first option for each sub-question
+                answers = {sq["id"]: sq["answer_options"][0] for sq in sub_questions}
+        else:
+            logger.warning("No JSON found in LLM response: %s", text[:200])
+            answers = {sq["id"]: sq["answer_options"][0] for sq in sub_questions}
+
+    # Validate answers against valid options
+    valid_answers: dict[str, str] = {}
+    sq_lookup = {sq["id"]: sq for sq in sub_questions}
+    for sq_id, sq_data in sq_lookup.items():
+        chosen = answers.get(sq_id, sq_data["answer_options"][0])
+        if chosen not in sq_data["answer_options"]:
+            logger.warning("Invalid answer '%s' for %s, using first option", chosen, sq_id)
+            chosen = sq_data["answer_options"][0]
+        valid_answers[sq_id] = chosen
+
+    return valid_answers
+
+
+def survey_respond(state: SurveyAgentState) -> dict:
+    """Each persona answers the structured sub-questions."""
     respondent = state["respondent"]
     agent_name = state["agent_name"]
+    sub_questions = state["sub_questions"]
     question = state["question"]
-    round_num = state["round_num"]
-    previous_responses = state.get("previous_responses", "")
     model = state["model"]
     api_key = state["api_key"]
 
@@ -33,13 +86,10 @@ def agent_respond(state: AgentState) -> dict:
         region=respondent.get("region", "Unknown"),
     )
 
-    if round_num == 1 or not previous_responses:
-        user_prompt = ROUND_1_USER.format(question=question)
-    else:
-        user_prompt = ROUND_N_USER.format(
-            question=question,
-            previous_responses=previous_responses,
-        )
+    user_prompt = SURVEY_USER.format(
+        question=question,
+        sub_questions_text=_format_sub_questions(sub_questions),
+    )
 
     llm = get_llm(model, api_key)
     response = llm.invoke([
@@ -47,23 +97,13 @@ def agent_respond(state: AgentState) -> dict:
         HumanMessage(content=user_prompt),
     ])
 
+    answers = _parse_answers(response.content, sub_questions)
+
     return {
-        "round_responses": [{
+        "responses": [{
             "respondent_id": respondent["id"],
             "agent_name": agent_name,
-            "round_num": round_num,
-            "content": response.content,
+            "model": model,
+            "answers": answers,
         }]
-    }
-
-
-def collect_round(state: DebateState) -> dict:
-    finished_round = state["current_round"] + 1
-    current_responses = [r for r in state["round_responses"] if r["round_num"] == finished_round]
-    all_rounds = list(state.get("all_rounds") or [])
-    all_rounds.append(current_responses)
-
-    return {
-        "all_rounds": all_rounds,
-        "current_round": finished_round,
     }

@@ -37,46 +37,68 @@ export interface Filters {
   architecture_trend?: string[]
 }
 
-export interface AgentMessage {
+// Survey types
+
+export interface SubQuestion {
   id: string
-  debate_id: string
-  round_num: number
+  text: string
+  answer_options: string[]
+  chart_type: "bar" | "pie"
+}
+
+export interface QuestionBreakdown {
+  original_question: string
+  sub_questions: SubQuestion[]
+}
+
+export interface SurveyResponse {
+  id: string
+  survey_id: string
   respondent_id: number
   agent_name: string
-  content: string
-}
-
-export interface DebateSession {
-  id: string
-  question: string
-  panel_size: number
-  num_rounds: number
-  filters: Filters | null
   model: string
+  answers: Record<string, string> // sub_question_id -> chosen option
+}
+
+export interface SurveySession {
+  id: string
+  question: string
+  breakdown: QuestionBreakdown | null
+  panel_size: number
+  filters: Filters | null
+  models: string[]
   panel: Respondent[]
-  messages: AgentMessage[]
+  responses: SurveyResponse[]
   created_at: string | null
 }
 
-export interface DebateSummary {
+export interface SurveySummary {
   id: string
   question: string
   panel_size: number
-  num_rounds: number
   created_at: string | null
+}
+
+export interface CompletedSurvey {
+  id: string
+  question: string
+  breakdown: QuestionBreakdown
+  responses: SurveyResponse[]
+  panel: Respondent[]
 }
 
 export interface WSMessage {
-  type: "agent_response" | "round_done" | "debate_done" | "error"
+  type: "survey_response" | "survey_done" | "error"
   data: Record<string, unknown>
 }
 
-export interface DebateSettings {
-  panelSize: number
-  numRounds: number
-  model: string
-  apiKey: string
+export interface ApiKeys {
+  anthropic: string
+  openai: string
+  google: string
 }
+
+export type SurveyPhase = "idle" | "analyzing" | "reviewing" | "running" | "complete"
 
 export const MODEL_OPTIONS = [
   { value: "claude-opus-4-6", label: "Claude Opus 4.6", provider: "Anthropic" },
@@ -90,3 +112,19 @@ export const MODEL_OPTIONS = [
   { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "Google" },
   { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "Google" },
 ] as const
+
+export const PROVIDER_NAMES = ["Anthropic", "OpenAI", "Google"] as const
+export type ProviderName = (typeof PROVIDER_NAMES)[number]
+
+export function getProviderKey(provider: ProviderName): keyof ApiKeys {
+  const map: Record<ProviderName, keyof ApiKeys> = {
+    Anthropic: "anthropic",
+    OpenAI: "openai",
+    Google: "google",
+  }
+  return map[provider]
+}
+
+export function getModelProvider(modelValue: string): ProviderName {
+  return MODEL_OPTIONS.find((m) => m.value === modelValue)?.provider ?? "Anthropic"
+}

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react"
-import { useDebateStore } from "@/store/debateStore"
+import { useSurveyStore } from "@/store/surveyStore"
 import { getFilterOptions, getRespondentCount } from "@/api/client"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { Slider } from "@/components/ui/slider"
 import {
   Select,
   SelectContent,
@@ -11,8 +12,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
 import type { FilterOptions, Filters } from "@/types"
-import { X } from "lucide-react"
+import { X, AlertTriangle } from "lucide-react"
 
 const FILTER_KEYS: { key: keyof Filters; label: string }[] = [
   { key: "role", label: "Role" },
@@ -24,7 +26,7 @@ const FILTER_KEYS: { key: keyof Filters; label: string }[] = [
 ]
 
 export function FilterPanel() {
-  const { filters, setFilter, clearFilters } = useDebateStore()
+  const { filters, setFilter, clearFilters, panelSize, setPanelSize } = useSurveyStore()
   const [options, setOptions] = useState<FilterOptions | null>(null)
   const [count, setCount] = useState<number | null>(null)
 
@@ -47,20 +49,41 @@ export function FilterPanel() {
   const hasFilters = Object.values(filters).some((v) => v && v.length > 0)
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
+      {/* Panel Size */}
+      <div className="space-y-2">
+        <Label className="text-xs">Panel Size: {panelSize}</Label>
+        <Slider
+          value={[panelSize]}
+          onValueChange={([v]) => setPanelSize(v)}
+          min={2}
+          max={Math.min(count ?? 100, 1136)}
+          step={panelSize < 12 ? 1 : panelSize < 50 ? 2 : panelSize < 200 ? 10 : 50}
+        />
+        {panelSize > 20 && (
+          <div className="flex items-start gap-1.5 text-[10px] text-yellow-600">
+            <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
+            <span>Large panels use more API credits</span>
+          </div>
+        )}
+      </div>
+
+      <Separator />
+
+      {/* Filters */}
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">
+        <h3 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">
           Filters
         </h3>
         {hasFilters && (
-          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={clearFilters}>
-            <X className="w-3 h-3 mr-1" /> Clear
+          <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px]" onClick={clearFilters}>
+            <X className="w-3 h-3 mr-0.5" /> Clear
           </Button>
         )}
       </div>
 
       {count !== null && (
-        <Badge variant="secondary" className="text-xs">
+        <Badge variant="secondary" className="text-[10px]">
           {count} respondents match
         </Badge>
       )}
@@ -71,12 +94,12 @@ export function FilterPanel() {
         const selected = filters[key]
         return (
           <div key={key} className="space-y-1">
-            <Label className="text-xs">{label}</Label>
+            <Label className="text-[10px] text-muted-foreground">{label}</Label>
             <Select
               value={selected?.[0] ?? "__all__"}
               onValueChange={(v) => setFilter(key, v === "__all__" ? [] : [v])}
             >
-              <SelectTrigger className="w-full text-xs">
+              <SelectTrigger className="w-full h-8 text-xs">
                 <SelectValue placeholder={`All ${label}`} />
               </SelectTrigger>
               <SelectContent>

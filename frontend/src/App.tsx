@@ -1,16 +1,15 @@
 import { Layout } from "@/components/Layout"
-import { DebateView } from "@/components/DebateView"
+import { SurveyView } from "@/components/SurveyView"
 import { ChatInput } from "@/components/ChatInput"
 import { SettingsModal } from "@/components/SettingsModal"
-import { ScrollArea } from "@/components/ui/scroll-area"
 
 function App() {
   return (
     <Layout>
-      <ScrollArea className="flex-1 p-6">
-        <DebateView />
-      </ScrollArea>
-      <div className="border-t p-4">
+      <div className="flex-1 overflow-y-auto p-6">
+        <SurveyView />
+      </div>
+      <div className="border-t p-4 shrink-0">
         <ChatInput />
       </div>
       <SettingsModal />

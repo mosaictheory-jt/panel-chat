@@ -2,23 +2,21 @@ import operator
 from typing import Annotated, TypedDict
 
 
-class AgentState(TypedDict):
+class SurveyAgentState(TypedDict):
     respondent: dict
     agent_name: str
+    sub_questions: list[dict]
     question: str
-    round_num: int
-    previous_responses: str
     model: str
     api_key: str
+    survey_id: str
 
 
-class DebateState(TypedDict):
+class SurveyState(TypedDict):
     question: str
+    sub_questions: list[dict]
     panel: list[dict]
-    num_rounds: int
-    current_round: int
-    model: str
-    api_key: str
-    round_responses: Annotated[list[dict], operator.add]
-    all_rounds: list[list[dict]]
-    debate_id: str
+    models: list[str]
+    api_keys: dict[str, str]  # provider -> key
+    survey_id: str
+    responses: Annotated[list[dict], operator.add]

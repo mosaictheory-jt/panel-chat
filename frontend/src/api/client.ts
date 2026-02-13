@@ -1,3 +1,5 @@
+import type { QuestionBreakdown, SurveySession, SurveySummary } from "@/types"
+
 const BASE_URL = "http://localhost:8000"
 
 async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
@@ -35,55 +37,44 @@ export async function getRespondentCount(filters: Record<string, string[]>) {
   )
 }
 
-export async function createDebate(body: {
+export async function createSurvey(body: {
   question: string
   panel_size: number
-  num_rounds: number
   filters: Record<string, string[]> | null
-  model: string
-  api_key: string
-}) {
-  return fetchJSON<{
-    id: string
-    question: string
-    panel_size: number
-    num_rounds: number
-    panel: Array<Record<string, unknown>>
-    model: string
-  }>("/api/debates", {
+  models: string[]
+  analyzer_model: string
+}): Promise<SurveySession> {
+  return fetchJSON<SurveySession>("/api/surveys", {
     method: "POST",
     body: JSON.stringify(body),
   })
 }
 
-export async function listDebates() {
-  return fetchJSON<
-    Array<{
-      id: string
-      question: string
-      panel_size: number
-      num_rounds: number
-      created_at: string | null
-    }>
-  >("/api/debates")
+export async function analyzeSurvey(
+  surveyId: string,
+  model: string,
+  apiKey: string,
+): Promise<QuestionBreakdown> {
+  return fetchJSON<QuestionBreakdown>(`/api/surveys/${surveyId}/analyze`, {
+    method: "POST",
+    body: JSON.stringify({ model, api_key: apiKey }),
+  })
 }
 
-export async function getDebate(id: string) {
-  return fetchJSON<{
-    id: string
-    question: string
-    panel_size: number
-    num_rounds: number
-    panel: Array<Record<string, unknown>>
-    messages: Array<{
-      id: string
-      debate_id: string
-      round_num: number
-      respondent_id: number
-      agent_name: string
-      content: string
-    }>
-    model: string
-    created_at: string | null
-  }>(`/api/debates/${id}`)
+export async function submitBreakdown(
+  surveyId: string,
+  breakdown: QuestionBreakdown,
+): Promise<QuestionBreakdown> {
+  return fetchJSON<QuestionBreakdown>(`/api/surveys/${surveyId}/breakdown`, {
+    method: "POST",
+    body: JSON.stringify({ breakdown }),
+  })
+}
+
+export async function listSurveys(): Promise<SurveySummary[]> {
+  return fetchJSON<SurveySummary[]>("/api/surveys")
+}
+
+export async function getSurvey(id: string): Promise<SurveySession> {
+  return fetchJSON<SurveySession>(`/api/surveys/${id}`)
 }

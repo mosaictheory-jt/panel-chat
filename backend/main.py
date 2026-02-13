@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.db import init_db, close_db
-from backend.routers import respondents, debates, ws
+from backend.routers import respondents, surveys, ws
 
 
 @asynccontextmanager
@@ -23,7 +23,7 @@ app.add_middleware(
 )
 
 app.include_router(respondents.router)
-app.include_router(debates.router)
+app.include_router(surveys.router)
 app.include_router(ws.router)
 
 

@@ -1,9 +1,21 @@
-from pydantic import BaseModel
+from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel, field_validator
 
 
 class Respondent(BaseModel):
     id: int
     timestamp: str | None = None
+
+    @field_validator("timestamp", mode="before")
+    @classmethod
+    def coerce_timestamp(cls, v: Any) -> str | None:
+        if v is None:
+            return None
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return str(v)
     role: str | None = None
     org_size: str | None = None
     industry: str | None = None

@@ -1,18 +1,23 @@
-import type { WSMessage } from "@/types"
+import type { ApiKeys, WSMessage } from "@/types"
 
 const WS_BASE = "ws://localhost:8000"
 
-export function connectDebateWS(
-  debateId: string,
-  apiKey: string,
+export function connectSurveyWS(
+  surveyId: string,
+  apiKeys: ApiKeys,
   onMessage: (msg: WSMessage) => void,
   onClose?: () => void,
-  onError?: (err: Event) => void
+  onError?: (err: Event) => void,
 ): WebSocket {
-  const ws = new WebSocket(`${WS_BASE}/ws/debates/${debateId}`)
+  const ws = new WebSocket(`${WS_BASE}/ws/surveys/${surveyId}`)
 
   ws.onopen = () => {
-    ws.send(JSON.stringify({ api_key: apiKey }))
+    // Send only keys that have values
+    const keysToSend: Record<string, string> = {}
+    for (const [provider, key] of Object.entries(apiKeys)) {
+      if (key) keysToSend[provider] = key
+    }
+    ws.send(JSON.stringify({ api_keys: keysToSend }))
   }
 
   ws.onmessage = (event) => {

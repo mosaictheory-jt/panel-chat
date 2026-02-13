@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:docs.langchain.com)",
+      "Bash(uv sync:*)",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest init:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(npm run build:*)",
+      "Bash(pkill:*)",
+      "Bash(uv run python:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial commit: panel chat app with AI survey debate engine\n\nFastAPI + LangGraph backend with DuckDB for survey data, concurrent\nagent debate via Send API fan-out, and WebSocket streaming. React +\nVite + TypeScript frontend with Tailwind, shadcn/ui, and Zustand.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(ssh:*)",
+      "Bash(npx tsc:*)",
+      "Bash(echo:*)",
+      "Bash(ls:*)",
+      "Bash(npx vite:*)",
+      "Bash(uv add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nSettings overhaul: client-side API keys, model selector with Gemini, settings modal\n\n- Replace server-side API keys with client-provided keys \\(BYOK\\)\n- Add Gemini support via langchain-google-genai\n- Replace LLM provider dropdown with model selector \\(6 models across 3 providers\\)\n- Move settings from sidebar into a modal with API key input, model picker,\n  panel size slider \\(2-1136 with cost warning\\), and rounds slider\n- Persist API key and model to localStorage; auto-open modal on first visit\n- WS protocol sends API key as first message after connect\n- Add cursor rules and comprehensive README\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "WebFetch(domain:platform.openai.com)",
+      "WebFetch(domain:ai.google.dev)",
+      "WebFetch(domain:docs.litellm.ai)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nUpdate model options to latest: Claude Opus 4.6, GPT-5.2, o3, Gemini 2.5\n\nReplace dated models \\(Claude Sonnet 4, GPT-4o, Gemini 2.0 Flash\\) with\ncurrent options: Claude Opus 4.6, Claude Sonnet 4.5, GPT-5.2, GPT-4.1,\no3, o3 Mini, Gemini 2.5 Pro, Gemini 2.5 Flash.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ]
+  }
+}

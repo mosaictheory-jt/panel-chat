@@ -1,33 +1,38 @@
 import asyncio
 import json
+import logging
 import queue
 import threading
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from backend.services.history import get_debate, save_message
-from backend.graph.builder import build_debate_graph
+
+from backend.services.history import get_survey, save_response
+from backend.graph.builder import build_survey_graph
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 _SENTINEL = object()
 
 
-@router.websocket("/ws/debates/{debate_id}")
-async def debate_ws(websocket: WebSocket, debate_id: str):
+@router.websocket("/ws/surveys/{survey_id}")
+async def survey_ws(websocket: WebSocket, survey_id: str):
     await websocket.accept()
 
     try:
-        # First message must contain the API key
+        # First message must contain the API keys
         init_raw = await websocket.receive_text()
         init_msg = json.loads(init_raw)
-        api_key = init_msg.get("api_key", "")
-        if not api_key:
-            await websocket.send_json({"type": "error", "data": {"message": "API key required"}})
+        api_keys = init_msg.get("api_keys", {})
+        if not api_keys or not any(api_keys.values()):
+            await websocket.send_json({"type": "error", "data": {"message": "At least one API key required"}})
             await websocket.close()
             return
 
-        session = get_debate(debate_id)
+        session = get_survey(survey_id)
         if not session:
-            await websocket.send_json({"type": "error", "data": {"message": "Debate not found"}})
+            await websocket.send_json({"type": "error", "data": {"message": "Survey not found"}})
             await websocket.close()
             return
 
@@ -36,18 +41,23 @@ async def debate_ws(websocket: WebSocket, debate_id: str):
             await websocket.close()
             return
 
-        graph = build_debate_graph()
+        if not session.breakdown:
+            await websocket.send_json({"type": "error", "data": {"message": "No breakdown configured"}})
+            await websocket.close()
+            return
+
+        graph = build_survey_graph()
+
+        sub_questions_dicts = [sq.model_dump() for sq in session.breakdown.sub_questions]
 
         initial_state = {
             "question": session.question,
+            "sub_questions": sub_questions_dicts,
             "panel": session.panel,
-            "num_rounds": session.num_rounds,
-            "current_round": 0,
-            "model": session.model,
-            "api_key": api_key,
-            "round_responses": [],
-            "all_rounds": [],
-            "debate_id": debate_id,
+            "models": session.models,
+            "api_keys": api_keys,
+            "survey_id": survey_id,
+            "responses": [],
         }
 
         # Thread-safe queue for streaming chunks from graph thread to async handler
@@ -58,8 +68,9 @@ async def debate_ws(websocket: WebSocket, debate_id: str):
                 for chunk in graph.stream(initial_state, stream_mode="updates"):
                     chunk_queue.put(chunk)
                 chunk_queue.put(_SENTINEL)
-            except Exception as e:
-                chunk_queue.put(e)
+            except Exception as exc:
+                logger.exception("Graph execution failed")
+                chunk_queue.put(exc)
 
         thread = threading.Thread(target=run_graph, daemon=True)
         thread.start()
@@ -76,36 +87,38 @@ async def debate_ws(websocket: WebSocket, debate_id: str):
                 break
 
             for node_name, node_output in item.items():
-                if node_name == "agent_respond":
-                    responses = node_output.get("round_responses", [])
+                if node_name == "survey_respond":
+                    responses = node_output.get("responses", [])
                     for resp in responses:
-                        save_message(
-                            debate_id=debate_id,
-                            round_num=resp["round_num"],
+                        saved = save_response(
+                            survey_id=survey_id,
                             respondent_id=resp["respondent_id"],
                             agent_name=resp["agent_name"],
-                            content=resp["content"],
+                            model=resp["model"],
+                            answers=resp["answers"],
                         )
                         await websocket.send_json({
-                            "type": "agent_response",
-                            "data": resp,
+                            "type": "survey_response",
+                            "data": {
+                                "id": saved.id,
+                                "survey_id": survey_id,
+                                "respondent_id": resp["respondent_id"],
+                                "agent_name": resp["agent_name"],
+                                "model": resp["model"],
+                                "answers": resp["answers"],
+                            },
                         })
-                elif node_name == "collect_round":
-                    current_round = node_output.get("current_round", 0)
-                    await websocket.send_json({
-                        "type": "round_done",
-                        "data": {"round_num": current_round},
-                    })
 
         await websocket.send_json({
-            "type": "debate_done",
-            "data": {"debate_id": debate_id},
+            "type": "survey_done",
+            "data": {"survey_id": survey_id},
         })
 
     except WebSocketDisconnect:
-        pass
-    except Exception as e:
+        logger.info("WebSocket disconnected for survey %s", survey_id)
+    except Exception as exc:
+        logger.exception("WebSocket error for survey %s", survey_id)
         try:
-            await websocket.send_json({"type": "error", "data": {"message": str(e)}})
+            await websocket.send_json({"type": "error", "data": {"message": str(exc)}})
         except Exception:
             pass

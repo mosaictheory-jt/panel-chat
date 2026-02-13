@@ -1,90 +1,123 @@
 import json
 import uuid
-from backend.db import get_conn
-from backend.models.chat import DebateSession, DebateSummary, AgentMessage
+from backend.db import execute_query
+from backend.models.survey import (
+    SurveySession,
+    SurveySummary,
+    SurveyResponse,
+    QuestionBreakdown,
+)
 
 
-def create_debate(
+def create_survey(
     question: str,
     panel_size: int,
-    num_rounds: int,
     filters: dict | None,
-    model: str,
+    models: list[str],
     panel: list[dict],
-) -> DebateSession:
-    conn = get_conn()
-    debate_id = str(uuid.uuid4())
-    conn.execute(
-        "INSERT INTO debates (id, question, panel_size, num_rounds, filters, model) VALUES (?, ?, ?, ?, ?, ?)",
-        [debate_id, question, panel_size, num_rounds, json.dumps(filters), model],
+) -> SurveySession:
+    survey_id = str(uuid.uuid4())
+    execute_query(
+        "INSERT INTO surveys (id, question, panel_size, filters, models, panel) VALUES (?, ?, ?, ?, ?, ?)",
+        [survey_id, question, panel_size, json.dumps(filters), json.dumps(models), json.dumps(panel)],
     )
-    return DebateSession(
-        id=debate_id,
+    return SurveySession(
+        id=survey_id,
         question=question,
         panel_size=panel_size,
-        num_rounds=num_rounds,
         filters=filters,
-        model=model,
+        models=models,
         panel=panel,
     )
 
 
-def save_message(
-    debate_id: str,
-    round_num: int,
+def update_breakdown(survey_id: str, breakdown: QuestionBreakdown) -> None:
+    execute_query(
+        "UPDATE surveys SET breakdown = ? WHERE id = ?",
+        [breakdown.model_dump_json(), survey_id],
+    )
+
+
+def save_response(
+    survey_id: str,
     respondent_id: int,
     agent_name: str,
-    content: str,
-) -> AgentMessage:
-    conn = get_conn()
-    msg_id = str(uuid.uuid4())
-    conn.execute(
-        "INSERT INTO debate_messages (id, debate_id, round_num, respondent_id, agent_name, content) VALUES (?, ?, ?, ?, ?, ?)",
-        [msg_id, debate_id, round_num, respondent_id, agent_name, content],
+    model: str,
+    answers: dict[str, str],
+) -> SurveyResponse:
+    resp_id = str(uuid.uuid4())
+    execute_query(
+        "INSERT INTO survey_responses (id, survey_id, respondent_id, agent_name, model, answers) VALUES (?, ?, ?, ?, ?, ?)",
+        [resp_id, survey_id, respondent_id, agent_name, model, json.dumps(answers)],
     )
-    return AgentMessage(
-        id=msg_id,
-        debate_id=debate_id,
-        round_num=round_num,
+    return SurveyResponse(
+        id=resp_id,
+        survey_id=survey_id,
         respondent_id=respondent_id,
         agent_name=agent_name,
-        content=content,
+        model=model,
+        answers=answers,
     )
 
 
-def list_debates() -> list[DebateSummary]:
-    conn = get_conn()
-    rows = conn.execute(
-        "SELECT id, question, panel_size, num_rounds, created_at FROM debates ORDER BY created_at DESC"
+def list_surveys() -> list[SurveySummary]:
+    rows = execute_query(
+        "SELECT id, question, panel_size, created_at FROM surveys ORDER BY created_at DESC"
     ).fetchall()
     return [
-        DebateSummary(
-            id=r[0], question=r[1], panel_size=r[2], num_rounds=r[3],
-            created_at=str(r[4]) if r[4] else None,
+        SurveySummary(
+            id=r[0], question=r[1], panel_size=r[2],
+            created_at=str(r[3]) if r[3] else None,
         )
         for r in rows
     ]
 
 
-def get_debate(debate_id: str) -> DebateSession | None:
-    conn = get_conn()
-    row = conn.execute(
-        "SELECT id, question, panel_size, num_rounds, filters, model, created_at FROM debates WHERE id = ?",
-        [debate_id],
+def get_survey(survey_id: str) -> SurveySession | None:
+    row = execute_query(
+        "SELECT id, question, breakdown, panel_size, filters, models, panel, created_at FROM surveys WHERE id = ?",
+        [survey_id],
     ).fetchone()
     if not row:
         return None
-    messages_rows = conn.execute(
-        "SELECT id, debate_id, round_num, respondent_id, agent_name, content FROM debate_messages WHERE debate_id = ? ORDER BY round_num, created_at",
-        [debate_id],
+
+    response_rows = execute_query(
+        "SELECT id, survey_id, respondent_id, agent_name, model, answers FROM survey_responses WHERE survey_id = ? ORDER BY created_at",
+        [survey_id],
     ).fetchall()
-    messages = [
-        AgentMessage(id=m[0], debate_id=m[1], round_num=m[2], respondent_id=m[3], agent_name=m[4], content=m[5])
-        for m in messages_rows
+
+    responses = [
+        SurveyResponse(
+            id=r[0], survey_id=r[1], respondent_id=r[2],
+            agent_name=r[3], model=r[4],
+            answers=json.loads(r[5]) if isinstance(r[5], str) else r[5],
+        )
+        for r in response_rows
     ]
-    filters = json.loads(row[4]) if row[4] else None
-    return DebateSession(
-        id=row[0], question=row[1], panel_size=row[2], num_rounds=row[3],
-        filters=filters, model=row[5],
-        messages=messages, created_at=str(row[6]) if row[6] else None,
+
+    breakdown_raw = row[2]
+    breakdown = None
+    if breakdown_raw:
+        breakdown_data = json.loads(breakdown_raw) if isinstance(breakdown_raw, str) else breakdown_raw
+        breakdown = QuestionBreakdown(**breakdown_data)
+
+    filters_raw = row[4]
+    filters = json.loads(filters_raw) if isinstance(filters_raw, str) else filters_raw
+
+    models_raw = row[5]
+    models = json.loads(models_raw) if isinstance(models_raw, str) else models_raw
+
+    panel_raw = row[6]
+    panel = json.loads(panel_raw) if isinstance(panel_raw, str) else (panel_raw or [])
+
+    return SurveySession(
+        id=row[0],
+        question=row[1],
+        breakdown=breakdown,
+        panel_size=row[3],
+        filters=filters,
+        models=models,
+        panel=panel,
+        responses=responses,
+        created_at=str(row[7]) if row[7] else None,
     )

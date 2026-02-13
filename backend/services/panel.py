@@ -1,14 +1,13 @@
-from backend.db import get_conn
+from backend.db import execute_query
 from backend.models.respondent import Respondent, FilterOptions
 
 FILTERABLE_COLUMNS = ["role", "org_size", "industry", "region", "ai_usage_frequency", "architecture_trend"]
 
 
 def get_filter_options() -> FilterOptions:
-    conn = get_conn()
     options: dict[str, list[str]] = {}
     for col in FILTERABLE_COLUMNS:
-        rows = conn.execute(
+        rows = execute_query(
             f"SELECT DISTINCT {col} FROM respondents WHERE {col} IS NOT NULL AND {col} != '' ORDER BY {col}"
         ).fetchall()
         options[col] = [r[0] for r in rows]
@@ -16,21 +15,20 @@ def get_filter_options() -> FilterOptions:
 
 
 def get_respondent_count(filters: dict[str, list[str]] | None = None) -> int:
-    conn = get_conn()
     where, params = _build_where(filters)
-    result = conn.execute(f"SELECT COUNT(*) FROM respondents {where}", params).fetchone()
+    result = execute_query(f"SELECT COUNT(*) FROM respondents {where}", params).fetchone()
     return result[0] if result else 0
 
 
 def select_panel(panel_size: int, filters: dict[str, list[str]] | None = None) -> list[Respondent]:
-    conn = get_conn()
     where, params = _build_where(filters)
     query = f"""
         SELECT * FROM respondents {where}
         USING SAMPLE {panel_size} ROWS
     """
-    rows = conn.execute(query, params).fetchall()
-    columns = [desc[0] for desc in conn.description]
+    cursor = execute_query(query, params)
+    rows = cursor.fetchall()
+    columns = [desc[0] for desc in cursor.description]
     return [Respondent(**dict(zip(columns, row))) for row in rows]
 
 
