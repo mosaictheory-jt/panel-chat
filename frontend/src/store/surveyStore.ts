@@ -30,10 +30,10 @@ function loadSelectedModels(): string[] {
     try {
       return JSON.parse(stored)
     } catch {
-      return ["claude-sonnet-4-5-20250929"]
+      return []
     }
   }
-  return ["claude-sonnet-4-5-20250929"]
+  return []
 }
 
 interface SurveyState {
@@ -99,7 +99,7 @@ interface SurveyState {
 export const useSurveyStore = create<SurveyState>((set, get) => ({
   apiKeys: loadApiKeys(),
   selectedModels: loadSelectedModels(),
-  analyzerModel: localStorage.getItem(STORAGE_KEY_ANALYZER) || "claude-sonnet-4-5-20250929",
+  analyzerModel: localStorage.getItem(STORAGE_KEY_ANALYZER) || "",
   panelSize: 5,
   settingsOpen: !loadApiKeys().anthropic && !loadApiKeys().openai && !loadApiKeys().google,
 
