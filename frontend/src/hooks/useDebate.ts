@@ -37,7 +37,8 @@ export function useDebate() {
         panel_size: store.panelSize,
         num_rounds: store.numRounds,
         filters: Object.keys(activeFilters).length > 0 ? activeFilters : null,
-        llm_provider: store.llmProvider,
+        model: store.model,
+        api_key: store.apiKey,
       })
 
       store.startDebate(session.id, question, session.panel as never[])
@@ -45,6 +46,7 @@ export function useDebate() {
       // Connect WebSocket
       const ws = connectDebateWS(
         session.id,
+        store.apiKey,
         (msg: WSMessage) => {
           switch (msg.type) {
             case "agent_response": {

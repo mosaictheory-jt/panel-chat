@@ -1,4 +1,5 @@
 import asyncio
+import json
 import queue
 import threading
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -15,6 +16,15 @@ async def debate_ws(websocket: WebSocket, debate_id: str):
     await websocket.accept()
 
     try:
+        # First message must contain the API key
+        init_raw = await websocket.receive_text()
+        init_msg = json.loads(init_raw)
+        api_key = init_msg.get("api_key", "")
+        if not api_key:
+            await websocket.send_json({"type": "error", "data": {"message": "API key required"}})
+            await websocket.close()
+            return
+
         session = get_debate(debate_id)
         if not session:
             await websocket.send_json({"type": "error", "data": {"message": "Debate not found"}})
@@ -33,7 +43,8 @@ async def debate_ws(websocket: WebSocket, debate_id: str):
             "panel": session.panel,
             "num_rounds": session.num_rounds,
             "current_round": 0,
-            "llm_provider": session.llm_provider,
+            "model": session.model,
+            "api_key": api_key,
             "round_responses": [],
             "all_rounds": [],
             "debate_id": debate_id,

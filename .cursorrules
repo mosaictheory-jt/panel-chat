@@ -1,0 +1,113 @@
+# Panel Chat - Cursor Rules
+
+## Project Overview
+Panel Chat is a full-stack app that lets users ask questions to AI agents representing real survey respondents. A LangGraph workflow fans out questions to persona-agents in parallel, collects responses per round, and streams results over WebSocket.
+
+## Tech Stack
+
+### Backend (Python 3.12+)
+- **FastAPI** with async lifespan, CORS for localhost:5173
+- **LangGraph** for multi-agent debate orchestration (fan-out/collect pattern)
+- **LangChain** chat models: Anthropic, OpenAI, Google Gemini
+- **DuckDB** for persistence (respondents from CSV, debates, messages)
+- **Pydantic v2** models and settings
+- **uv** for dependency management (use `uv add`, not pip)
+
+### Frontend (TypeScript)
+- **React 19** with Vite 7
+- **Tailwind CSS v4** (via @tailwindcss/vite plugin, no tailwind.config)
+- **shadcn/ui** components in `src/components/ui/` (Radix primitives + CVA)
+- **Zustand** for state management
+- **Lucide React** for icons
+- **react-markdown** for rendering LLM responses
+
+## Architecture
+
+### Backend Structure
+```
+backend/
+  main.py          # FastAPI app, lifespan, CORS, router mounting
+  config.py        # Settings (duckdb_path, csv_path only - no API keys)
+  db.py            # DuckDB connection, schema init
+  models/          # Pydantic models (chat.py, respondent.py, ws.py)
+  routers/         # FastAPI routes (debates.py, respondents.py, ws.py)
+  services/        # Business logic (llm.py, history.py, panel.py)
+  graph/           # LangGraph workflow
+    state.py       # TypedDicts for DebateState and AgentState
+    nodes.py       # Node functions (agent_respond, collect_round)
+    builder.py     # Graph construction with fan-out/collect pattern
+    prompts.py     # System/user prompt templates
+```
+
+### Frontend Structure
+```
+frontend/src/
+  App.tsx           # Root layout + SettingsModal
+  api/client.ts     # HTTP API calls
+  api/ws.ts         # WebSocket connection (sends API key as first msg)
+  store/debateStore.ts  # Zustand store (settings, filters, debate state, history)
+  hooks/useDebate.ts    # Debate lifecycle hook
+  components/       # App components
+  components/ui/    # shadcn/ui primitives (do not edit manually)
+  types/index.ts    # Shared types and MODEL_OPTIONS constant
+```
+
+### Key Data Flow
+1. User configures API key + model in SettingsModal (persisted to localStorage)
+2. `createDebate` POST sends question, model, api_key, panel_size, filters
+3. Backend selects panel from respondents, stores debate (model saved, api_key NOT persisted)
+4. Frontend opens WebSocket, sends `{"api_key": "..."}` as first message
+5. LangGraph fans out to agent_respond nodes in parallel per panelist
+6. Responses stream back via WS as `agent_response` events
+7. After all panelists respond, `collect_round` aggregates; repeats for num_rounds
+
+## Conventions
+
+### Python
+- Type hints on all function signatures
+- No server-side API keys - all keys come from the client
+- `get_llm(model, api_key)` auto-detects provider from model name prefix
+- DuckDB queries use parameterized statements
+- Import sorting: stdlib, third-party, local
+
+### TypeScript
+- Functional components only, no classes
+- Path alias `@/` maps to `src/`
+- Store selectors: `useDebateStore((s) => s.field)` for individual fields
+- No semicolons in component files (project style)
+- Destructure store values in components
+
+### shadcn/ui
+- Components live in `src/components/ui/` - add new ones via `npx shadcn@latest add <name>`
+- Do not manually edit files in `components/ui/`
+- App-level components compose UI primitives from this directory
+
+### State Management
+- Settings (apiKey, model) persist to localStorage
+- settingsOpen auto-opens if no API key stored
+- Debate state (messages, panel, round) lives in Zustand, not persisted
+
+## Running the App
+```bash
+# Backend
+uv run uvicorn backend.main:app --reload
+
+# Frontend
+cd frontend && npm run dev
+```
+
+## Common Tasks
+
+### Adding a new LLM provider
+1. Add langchain integration to `pyproject.toml` via `uv add`
+2. Update `backend/services/llm.py`: add prefix detection + model instantiation
+3. Add models to `MODEL_OPTIONS` in `frontend/src/types/index.ts`
+
+### Adding a new shadcn component
+```bash
+cd frontend && npx shadcn@latest add <component-name>
+```
+
+### Database schema changes
+- Edit `backend/db.py` `init_db()`
+- Delete local `.duckdb` file to recreate (uses `CREATE TABLE IF NOT EXISTS`)

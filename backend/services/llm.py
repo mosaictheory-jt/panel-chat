@@ -1,23 +1,39 @@
 from langchain_core.language_models.chat_models import BaseChatModel
-from backend.config import settings
 
 
-def get_llm(provider: str | None = None) -> BaseChatModel:
-    provider = provider or settings.llm_provider
+def _detect_provider(model: str) -> str:
+    if model.startswith("claude"):
+        return "anthropic"
+    if model.startswith("gpt") or model.startswith("o1") or model.startswith("o3"):
+        return "openai"
+    if model.startswith("gemini"):
+        return "google"
+    raise ValueError(f"Cannot detect provider for model: {model}")
+
+
+def get_llm(model: str, api_key: str) -> BaseChatModel:
+    provider = _detect_provider(model)
 
     if provider == "anthropic":
         from langchain_anthropic import ChatAnthropic
         return ChatAnthropic(
-            model=settings.anthropic_model,
-            api_key=settings.anthropic_api_key,
+            model=model,
+            api_key=api_key,
             max_tokens=1024,
         )
     elif provider == "openai":
         from langchain_openai import ChatOpenAI
         return ChatOpenAI(
-            model=settings.openai_model,
-            api_key=settings.openai_api_key,
+            model=model,
+            api_key=api_key,
             max_tokens=1024,
         )
+    elif provider == "google":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(
+            model=model,
+            google_api_key=api_key,
+            max_output_tokens=1024,
+        )
     else:
-        raise ValueError(f"Unknown LLM provider: {provider}")
+        raise ValueError(f"Unknown provider: {provider}")

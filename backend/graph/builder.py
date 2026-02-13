@@ -19,7 +19,8 @@ def _fan_out(state: DebateState) -> list[Send]:
     panel = state["panel"]
     current_round = state["current_round"]
     all_rounds = state.get("all_rounds") or []
-    llm_provider = state["llm_provider"]
+    model = state["model"]
+    api_key = state["api_key"]
 
     previous_responses = _format_previous_responses(all_rounds) if all_rounds else ""
 
@@ -32,7 +33,8 @@ def _fan_out(state: DebateState) -> list[Send]:
             "question": question,
             "round_num": current_round + 1,
             "previous_responses": previous_responses,
-            "llm_provider": llm_provider,
+            "model": model,
+            "api_key": api_key,
         }))
     return sends
 

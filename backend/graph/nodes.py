@@ -10,7 +10,8 @@ def agent_respond(state: AgentState) -> dict:
     question = state["question"]
     round_num = state["round_num"]
     previous_responses = state.get("previous_responses", "")
-    llm_provider = state["llm_provider"]
+    model = state["model"]
+    api_key = state["api_key"]
 
     system_prompt = PERSONA_SYSTEM.format(
         role=respondent.get("role", "Unknown"),
@@ -40,7 +41,7 @@ def agent_respond(state: AgentState) -> dict:
             previous_responses=previous_responses,
         )
 
-    llm = get_llm(llm_provider)
+    llm = get_llm(model, api_key)
     response = llm.invoke([
         SystemMessage(content=system_prompt),
         HumanMessage(content=user_prompt),

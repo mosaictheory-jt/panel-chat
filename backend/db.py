@@ -31,7 +31,7 @@ def init_db() -> None:
             panel_size INTEGER NOT NULL,
             num_rounds INTEGER NOT NULL,
             filters JSON,
-            llm_provider VARCHAR NOT NULL,
+            model VARCHAR NOT NULL,
             created_at TIMESTAMP DEFAULT current_timestamp
         )
     """)

@@ -3,12 +3,13 @@ import { useDebateStore } from "@/store/debateStore"
 import { getDebate, listDebates } from "@/api/client"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { SettingsPanel } from "./SettingsPanel"
+import { Button } from "@/components/ui/button"
 import { FilterPanel } from "./FilterPanel"
+import { Settings } from "lucide-react"
 import type { AgentMessage, Respondent } from "@/types"
 
 export function Sidebar() {
-  const { history, setHistory, loadDebate, debateId } = useDebateStore()
+  const { history, setHistory, loadDebate, debateId, setSettingsOpen } = useDebateStore()
 
   useEffect(() => {
     listDebates().then(setHistory).catch(console.error)
@@ -31,16 +32,24 @@ export function Sidebar() {
 
   return (
     <div className="w-72 border-r flex flex-col h-full bg-sidebar">
-      <div className="p-4 border-b">
-        <h1 className="font-bold text-lg">Panel Chat</h1>
-        <p className="text-xs text-muted-foreground">
-          AI-powered survey panel debates
-        </p>
+      <div className="p-4 border-b flex items-center justify-between">
+        <div>
+          <h1 className="font-bold text-lg">Panel Chat</h1>
+          <p className="text-xs text-muted-foreground">
+            AI-powered survey panel debates
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Settings"
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
       </div>
 
       <ScrollArea className="flex-1 px-4 py-4">
-        <SettingsPanel />
-        <Separator className="my-4" />
         <FilterPanel />
         <Separator className="my-4" />
 

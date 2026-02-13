@@ -52,7 +52,7 @@ export interface DebateSession {
   panel_size: number
   num_rounds: number
   filters: Filters | null
-  llm_provider: string
+  model: string
   panel: Respondent[]
   messages: AgentMessage[]
   created_at: string | null
@@ -74,5 +74,15 @@ export interface WSMessage {
 export interface DebateSettings {
   panelSize: number
   numRounds: number
-  llmProvider: "anthropic" | "openai"
+  model: string
+  apiKey: string
 }
+
+export const MODEL_OPTIONS = [
+  { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4", provider: "Anthropic" },
+  { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", provider: "Anthropic" },
+  { value: "gpt-4o", label: "GPT-4o", provider: "OpenAI" },
+  { value: "gpt-4o-mini", label: "GPT-4o Mini", provider: "OpenAI" },
+  { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash", provider: "Google" },
+  { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "Google" },
+] as const

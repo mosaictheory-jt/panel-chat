@@ -40,7 +40,8 @@ export async function createDebate(body: {
   panel_size: number
   num_rounds: number
   filters: Record<string, string[]> | null
-  llm_provider: string
+  model: string
+  api_key: string
 }) {
   return fetchJSON<{
     id: string
@@ -48,7 +49,7 @@ export async function createDebate(body: {
     panel_size: number
     num_rounds: number
     panel: Array<Record<string, unknown>>
-    llm_provider: string
+    model: string
   }>("/api/debates", {
     method: "POST",
     body: JSON.stringify(body),
@@ -82,7 +83,7 @@ export async function getDebate(id: string) {
       agent_name: string
       content: string
     }>
-    llm_provider: string
+    model: string
     created_at: string | null
   }>(`/api/debates/${id}`)
 }

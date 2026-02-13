@@ -2,14 +2,12 @@ from fastapi import APIRouter, HTTPException
 from backend.models.chat import DebateRequest, DebateSession, DebateSummary
 from backend.services.panel import select_panel
 from backend.services.history import create_debate, list_debates, get_debate
-from backend.config import settings
 
 router = APIRouter(prefix="/api/debates", tags=["debates"])
 
 
 @router.post("", response_model=DebateSession)
 def create(req: DebateRequest):
-    provider = req.llm_provider or settings.llm_provider
     panel = select_panel(req.panel_size, req.filters)
     panel_dicts = [r.model_dump() for r in panel]
     session = create_debate(
@@ -17,7 +15,7 @@ def create(req: DebateRequest):
         panel_size=req.panel_size,
         num_rounds=req.num_rounds,
         filters=req.filters,
-        llm_provider=provider,
+        model=req.model,
         panel=panel_dicts,
     )
     session.panel = panel_dicts

@@ -8,7 +8,8 @@ class AgentState(TypedDict):
     question: str
     round_num: int
     previous_responses: str
-    llm_provider: str
+    model: str
+    api_key: str
 
 
 class DebateState(TypedDict):
@@ -16,7 +17,8 @@ class DebateState(TypedDict):
     panel: list[dict]
     num_rounds: int
     current_round: int
-    llm_provider: str
+    model: str
+    api_key: str
     round_responses: Annotated[list[dict], operator.add]
     all_rounds: list[list[dict]]
     debate_id: str

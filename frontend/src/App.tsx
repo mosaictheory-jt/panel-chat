@@ -1,6 +1,7 @@
 import { Layout } from "@/components/Layout"
 import { DebateView } from "@/components/DebateView"
 import { ChatInput } from "@/components/ChatInput"
+import { SettingsModal } from "@/components/SettingsModal"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
       <div className="border-t p-4">
         <ChatInput />
       </div>
+      <SettingsModal />
     </Layout>
   )
 }

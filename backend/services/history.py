@@ -9,14 +9,14 @@ def create_debate(
     panel_size: int,
     num_rounds: int,
     filters: dict | None,
-    llm_provider: str,
+    model: str,
     panel: list[dict],
 ) -> DebateSession:
     conn = get_conn()
     debate_id = str(uuid.uuid4())
     conn.execute(
-        "INSERT INTO debates (id, question, panel_size, num_rounds, filters, llm_provider) VALUES (?, ?, ?, ?, ?, ?)",
-        [debate_id, question, panel_size, num_rounds, json.dumps(filters), llm_provider],
+        "INSERT INTO debates (id, question, panel_size, num_rounds, filters, model) VALUES (?, ?, ?, ?, ?, ?)",
+        [debate_id, question, panel_size, num_rounds, json.dumps(filters), model],
     )
     return DebateSession(
         id=debate_id,
@@ -24,7 +24,7 @@ def create_debate(
         panel_size=panel_size,
         num_rounds=num_rounds,
         filters=filters,
-        llm_provider=llm_provider,
+        model=model,
         panel=panel,
     )
 
@@ -69,7 +69,7 @@ def list_debates() -> list[DebateSummary]:
 def get_debate(debate_id: str) -> DebateSession | None:
     conn = get_conn()
     row = conn.execute(
-        "SELECT id, question, panel_size, num_rounds, filters, llm_provider, created_at FROM debates WHERE id = ?",
+        "SELECT id, question, panel_size, num_rounds, filters, model, created_at FROM debates WHERE id = ?",
         [debate_id],
     ).fetchone()
     if not row:
@@ -85,6 +85,6 @@ def get_debate(debate_id: str) -> DebateSession | None:
     filters = json.loads(row[4]) if row[4] else None
     return DebateSession(
         id=row[0], question=row[1], panel_size=row[2], num_rounds=row[3],
-        filters=filters, llm_provider=row[5],
+        filters=filters, model=row[5],
         messages=messages, created_at=str(row[6]) if row[6] else None,
     )
