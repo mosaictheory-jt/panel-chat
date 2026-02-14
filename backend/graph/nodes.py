@@ -2,8 +2,16 @@ import json
 import logging
 
 from langchain_core.messages import SystemMessage, HumanMessage
-from backend.graph.state import SurveyAgentState
-from backend.graph.prompts import PERSONA_SYSTEM, PERSONA_MEMORY_BLOCK, SURVEY_USER
+from backend.graph.state import SurveyAgentState, DebateAgentState, DebateState
+from backend.graph.prompts import (
+    PERSONA_SYSTEM,
+    PERSONA_MEMORY_BLOCK,
+    SURVEY_USER,
+    DEBATE_USER,
+    DEBATE_FOLLOWUP_USER,
+    DEBATE_SUMMARY_SYSTEM,
+    DEBATE_SUMMARY_USER,
+)
 from backend.services.llm import get_llm
 from backend.services.history import get_respondent_history
 
@@ -45,6 +53,63 @@ def _format_history(history: list[dict]) -> str:
     return PERSONA_MEMORY_BLOCK.format(history_text=history_text)
 
 
+def _build_system_prompt(respondent: dict, survey_id: str, persona_memory: bool) -> str:
+    """Build the persona system prompt, optionally including memory."""
+    memory_block = ""
+    if persona_memory:
+        respondent_id = respondent["id"]
+        history = get_respondent_history(respondent_id, exclude_survey_id=survey_id)
+        if history:
+            logger.info(
+                "Persona %d has %d past surveys in memory",
+                respondent_id, len(history),
+            )
+            memory_block = _format_history(history)
+
+    return PERSONA_SYSTEM.format(
+        role=respondent.get("role", "Unknown"),
+        org_size=respondent.get("org_size", "Unknown"),
+        industry=respondent.get("industry", "Unknown"),
+        team_focus=respondent.get("team_focus", "Unknown"),
+        storage_environment=respondent.get("storage_environment", "Unknown"),
+        orchestration=respondent.get("orchestration", "Unknown"),
+        ai_usage_frequency=respondent.get("ai_usage_frequency", "Unknown"),
+        ai_helps_with=respondent.get("ai_helps_with", "Unknown"),
+        ai_adoption=respondent.get("ai_adoption", "Unknown"),
+        modeling_approach=respondent.get("modeling_approach", "Unknown"),
+        modeling_pain_points=respondent.get("modeling_pain_points", "Unknown"),
+        architecture_trend=respondent.get("architecture_trend", "Unknown"),
+        biggest_bottleneck=respondent.get("biggest_bottleneck", "Unknown"),
+        team_growth_2026=respondent.get("team_growth_2026", "Unknown"),
+        education_topic=respondent.get("education_topic", "Unknown"),
+        industry_wish=respondent.get("industry_wish", "Unknown"),
+        region=respondent.get("region", "Unknown"),
+        memory_block=memory_block,
+    )
+
+
+def _extract_token_usage(response) -> dict | None:
+    """Extract token usage from LLM response metadata."""
+    token_usage = None
+    usage_meta = getattr(response, "usage_metadata", None)
+    if usage_meta:
+        input_tok = usage_meta.get("input_tokens", 0) if isinstance(usage_meta, dict) else getattr(usage_meta, "input_tokens", 0)
+        output_tok = usage_meta.get("output_tokens", 0) if isinstance(usage_meta, dict) else getattr(usage_meta, "output_tokens", 0)
+        token_usage = {
+            "input_tokens": input_tok or 0,
+            "output_tokens": output_tok or 0,
+        }
+    elif hasattr(response, "response_metadata"):
+        meta = response.response_metadata or {}
+        usage = meta.get("usage") or meta.get("token_usage") or {}
+        if usage:
+            token_usage = {
+                "input_tokens": usage.get("input_tokens") or usage.get("prompt_tokens") or 0,
+                "output_tokens": usage.get("output_tokens") or usage.get("completion_tokens") or 0,
+            }
+    return token_usage
+
+
 def _parse_answers(content: str, sub_questions: list[dict]) -> dict[str, str]:
     """Extract the JSON answer dict from LLM response, with fallback parsing."""
     text = content.strip()
@@ -83,6 +148,10 @@ def _parse_answers(content: str, sub_questions: list[dict]) -> dict[str, str]:
     return valid_answers
 
 
+# ---------------------------------------------------------------------------
+# Survey mode: single fan-out, structured answers
+# ---------------------------------------------------------------------------
+
 def survey_respond(state: SurveyAgentState) -> dict:
     """Each persona answers the structured sub-questions."""
     respondent = state["respondent"]
@@ -93,38 +162,9 @@ def survey_respond(state: SurveyAgentState) -> dict:
     api_key = state["api_key"]
     temperature = state.get("temperature")
     survey_id = state["survey_id"]
+    persona_memory = state.get("persona_memory", True)
 
-    # Fetch this persona's past answers for memory
-    respondent_id = respondent["id"]
-    history = get_respondent_history(respondent_id, exclude_survey_id=survey_id)
-    memory_block = _format_history(history)
-
-    if history:
-        logger.info(
-            "Persona %d has %d past surveys in memory",
-            respondent_id, len(history),
-        )
-
-    system_prompt = PERSONA_SYSTEM.format(
-        role=respondent.get("role", "Unknown"),
-        org_size=respondent.get("org_size", "Unknown"),
-        industry=respondent.get("industry", "Unknown"),
-        team_focus=respondent.get("team_focus", "Unknown"),
-        storage_environment=respondent.get("storage_environment", "Unknown"),
-        orchestration=respondent.get("orchestration", "Unknown"),
-        ai_usage_frequency=respondent.get("ai_usage_frequency", "Unknown"),
-        ai_helps_with=respondent.get("ai_helps_with", "Unknown"),
-        ai_adoption=respondent.get("ai_adoption", "Unknown"),
-        modeling_approach=respondent.get("modeling_approach", "Unknown"),
-        modeling_pain_points=respondent.get("modeling_pain_points", "Unknown"),
-        architecture_trend=respondent.get("architecture_trend", "Unknown"),
-        biggest_bottleneck=respondent.get("biggest_bottleneck", "Unknown"),
-        team_growth_2026=respondent.get("team_growth_2026", "Unknown"),
-        education_topic=respondent.get("education_topic", "Unknown"),
-        industry_wish=respondent.get("industry_wish", "Unknown"),
-        region=respondent.get("region", "Unknown"),
-        memory_block=memory_block,
-    )
+    system_prompt = _build_system_prompt(respondent, survey_id, persona_memory)
 
     user_prompt = SURVEY_USER.format(
         question=question,
@@ -138,32 +178,131 @@ def survey_respond(state: SurveyAgentState) -> dict:
     ])
 
     answers = _parse_answers(response.content, sub_questions)
-
-    # Extract token usage from response metadata (UsageMetadata is dict-like)
-    token_usage = None
-    usage_meta = getattr(response, "usage_metadata", None)
-    if usage_meta:
-        input_tok = usage_meta.get("input_tokens", 0) if isinstance(usage_meta, dict) else getattr(usage_meta, "input_tokens", 0)
-        output_tok = usage_meta.get("output_tokens", 0) if isinstance(usage_meta, dict) else getattr(usage_meta, "output_tokens", 0)
-        token_usage = {
-            "input_tokens": input_tok or 0,
-            "output_tokens": output_tok or 0,
-        }
-    elif hasattr(response, "response_metadata"):
-        meta = response.response_metadata or {}
-        usage = meta.get("usage") or meta.get("token_usage") or {}
-        if usage:
-            token_usage = {
-                "input_tokens": usage.get("input_tokens") or usage.get("prompt_tokens") or 0,
-                "output_tokens": usage.get("output_tokens") or usage.get("completion_tokens") or 0,
-            }
+    token_usage = _extract_token_usage(response)
 
     return {
         "responses": [{
-            "respondent_id": respondent_id,
+            "respondent_id": respondent["id"],
             "agent_name": agent_name,
             "model": model,
             "answers": answers,
             "token_usage": token_usage,
         }]
+    }
+
+
+# ---------------------------------------------------------------------------
+# Debate mode: multi-round, same structured answers but with prior-round context
+# ---------------------------------------------------------------------------
+
+def debate_respond(state: DebateAgentState) -> dict:
+    """Persona answers in debate mode — aware of prior round results."""
+    respondent = state["respondent"]
+    agent_name = state["agent_name"]
+    sub_questions = state["sub_questions"]
+    question = state["question"]
+    model = state["model"]
+    api_key = state["api_key"]
+    temperature = state.get("temperature")
+    survey_id = state["survey_id"]
+    persona_memory = state.get("persona_memory", True)
+    round_number = state["round_number"]
+    prior_round_summary = state.get("prior_round_summary", "")
+
+    system_prompt = _build_system_prompt(respondent, survey_id, persona_memory)
+
+    if round_number == 1 or not prior_round_summary:
+        user_prompt = DEBATE_USER.format(
+            question=question,
+            sub_questions_text=_format_sub_questions(sub_questions),
+        )
+    else:
+        user_prompt = DEBATE_FOLLOWUP_USER.format(
+            question=question,
+            round_number=round_number,
+            prior_round_summary=prior_round_summary,
+            sub_questions_text=_format_sub_questions(sub_questions),
+        )
+
+    llm = get_llm(model, api_key, temperature=temperature)
+    response = llm.invoke([
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=user_prompt),
+    ])
+
+    answers = _parse_answers(response.content, sub_questions)
+    token_usage = _extract_token_usage(response)
+
+    return {
+        "responses": [{
+            "respondent_id": respondent["id"],
+            "agent_name": agent_name,
+            "model": model,
+            "answers": answers,
+            "round": round_number,
+            "token_usage": token_usage,
+        }]
+    }
+
+
+def summarize_round(state: DebateState) -> dict:
+    """After a round completes, summarize the results for the next round's context."""
+    responses = state["responses"]
+    sub_questions = state["sub_questions"]
+    question = state["question"]
+    current_round = state["current_round"]
+    models = state["models"]
+    api_keys = state["api_keys"]
+    temperatures = state.get("temperatures", {})
+
+    # Filter responses for the current round
+    round_responses = [r for r in responses if r.get("round") == current_round]
+
+    # Build a tally for each sub-question
+    tally_lines = []
+    sq_lookup = {sq["id"]: sq for sq in sub_questions}
+    for sq_id, sq_data in sq_lookup.items():
+        counts: dict[str, int] = {}
+        for resp in round_responses:
+            chosen = resp["answers"].get(sq_id)
+            if chosen:
+                counts[chosen] = counts.get(chosen, 0) + 1
+        counts_str = ", ".join(f'"{opt}": {counts.get(opt, 0)}' for opt in sq_data["answer_options"])
+        tally_lines.append(f'- {sq_data["text"]}: {{{counts_str}}}')
+
+    tally_text = "\n".join(tally_lines)
+
+    # Use the first model that has an available API key for summarization
+    from backend.services.llm import _detect_provider
+    summary_model = None
+    api_key = ""
+    for candidate_model in models:
+        provider = _detect_provider(candidate_model)
+        candidate_key = api_keys.get(provider, "")
+        if candidate_key:
+            summary_model = candidate_model
+            api_key = candidate_key
+            break
+    if not summary_model or not api_key:
+        logger.error("No model with a valid API key available for summarization")
+        return {
+            "prior_round_summary": "Unable to generate summary — no API key available.",
+            "current_round": current_round + 1,
+        }
+    temperature = temperatures.get(summary_model)
+
+    llm = get_llm(summary_model, api_key, temperature=temperature)
+    response = llm.invoke([
+        SystemMessage(content=DEBATE_SUMMARY_SYSTEM),
+        HumanMessage(content=DEBATE_SUMMARY_USER.format(
+            question=question,
+            round_number=current_round,
+            total_respondents=len(round_responses),
+            tally_text=tally_text,
+        )),
+    ])
+
+    return {
+        "prior_round_summary": response.content.strip(),
+        "current_round": current_round + 1,
     }

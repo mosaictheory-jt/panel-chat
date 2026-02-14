@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Plus, Trash2, Play, BarChart3, PieChart, DollarSign } from "lucide-react"
+import { Plus, Trash2, Play, BarChart3, PieChart, DollarSign, Swords } from "lucide-react"
 import { estimateSurveyCost, formatCost } from "@/lib/pricing"
 import type { SubQuestion, QuestionBreakdown } from "@/types"
 
@@ -15,6 +15,8 @@ export function BreakdownEditor() {
   const storeBreakdown = useSurveyStore((s) => s.breakdown)
   const surveyModels = useSurveyStore((s) => s.surveyModels)
   const panel = useSurveyStore((s) => s.panel)
+  const chatMode = useSurveyStore((s) => s.chatMode)
+  const debateRounds = useSurveyStore((s) => s.debateRounds)
   const { runSurvey } = useSurvey()
 
   const [subQuestions, setSubQuestions] = useState<SubQuestion[]>(
@@ -108,9 +110,29 @@ export function BreakdownEditor() {
       (sq) => sq.text.trim() && sq.answer_options.length >= 2
     )
 
+  const roundMultiplier = chatMode === "debate" ? debateRounds : 1
   const costEstimate = useMemo(
-    () => estimateSurveyCost(surveyModels, panel.length, subQuestions.length),
-    [surveyModels, panel.length, subQuestions.length],
+    () => {
+      const base = estimateSurveyCost(surveyModels, panel.length, subQuestions.length)
+      if (roundMultiplier <= 1) return base
+      // Scale cost by number of debate rounds (+ summary calls per round)
+      return {
+        totalCost: base.totalCost * roundMultiplier,
+        perProvider: Object.fromEntries(
+          Object.entries(base.perProvider).map(([k, v]) => [
+            k,
+            {
+              ...v,
+              totalCost: v.totalCost * roundMultiplier,
+              inputCost: v.inputCost * roundMultiplier,
+              outputCost: v.outputCost * roundMultiplier,
+              calls: v.calls * roundMultiplier,
+            },
+          ])
+        ),
+      }
+    },
+    [surveyModels, panel.length, subQuestions.length, roundMultiplier],
   )
 
   const providerEntries = Object.entries(costEstimate.perProvider)
@@ -119,9 +141,19 @@ export function BreakdownEditor() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-semibold text-lg">Review Question Breakdown</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-lg">Review Question Breakdown</h3>
+            {chatMode === "debate" && (
+              <Badge className="text-xs bg-purple-500/10 text-purple-700 border-purple-500/30 gap-1">
+                <Swords className="w-3 h-3" />
+                Debate
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
-            Edit the sub-questions and answer options, then run the survey.
+            {chatMode === "debate"
+              ? `Edit the sub-questions, then start a ${debateRounds}-round debate.`
+              : "Edit the sub-questions and answer options, then run the survey."}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -141,6 +173,7 @@ export function BreakdownEditor() {
                   <p className="font-semibold">Estimated cost breakdown</p>
                   <p className="text-muted-foreground">
                     {panel.length} panelists × {surveyModels.length} model{surveyModels.length !== 1 ? "s" : ""} × {subQuestions.length} question{subQuestions.length !== 1 ? "s" : ""}
+                    {roundMultiplier > 1 && ` × ${roundMultiplier} rounds`}
                   </p>
                   {providerEntries.map(([provider, data]) => (
                     <div key={provider} className="flex justify-between gap-4">
@@ -162,7 +195,7 @@ export function BreakdownEditor() {
           )}
           <Button onClick={handleRunSurvey} disabled={!isValid} className="gap-2">
             <Play className="w-4 h-4" />
-            Run Survey
+            {chatMode === "debate" ? `Run Debate (${debateRounds} rounds)` : "Run Survey"}
           </Button>
         </div>
       </div>

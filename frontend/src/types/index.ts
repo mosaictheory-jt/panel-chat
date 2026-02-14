@@ -63,6 +63,7 @@ export interface SurveyResponse {
   agent_name: string
   model: string
   answers: Record<string, string> // sub_question_id -> chosen option
+  round?: number | null
   token_usage?: TokenUsage | null
 }
 
@@ -94,9 +95,11 @@ export interface CompletedSurvey {
 }
 
 export interface WSMessage {
-  type: "survey_response" | "survey_done" | "error"
+  type: "survey_response" | "survey_done" | "round_complete" | "error"
   data: Record<string, unknown>
 }
+
+export type ChatMode = "survey" | "debate"
 
 export interface ApiKeys {
   anthropic: string

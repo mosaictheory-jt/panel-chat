@@ -70,18 +70,36 @@ export function useSurvey() {
 
       // Submit the (possibly edited) breakdown
       await submitBreakdown(store.surveyId, breakdown)
+
+      const chatMode = store.chatMode
+      const numRounds = chatMode === "debate" ? store.debateRounds : 1
+
       store.startRunning()
+      if (chatMode === "debate") {
+        store.setRound(1, numRounds)
+      }
 
       // Connect WebSocket
       const ws = connectSurveyWS(
         store.surveyId,
         store.apiKeys,
         store.modelTemperatures,
+        {
+          personaMemory: store.personaMemory,
+          chatMode,
+          numRounds,
+        },
         (msg: WSMessage) => {
           switch (msg.type) {
             case "survey_response": {
               const data = msg.data as unknown as SurveyResponse
               store.addResponse(data)
+              break
+            }
+            case "round_complete": {
+              const round = msg.data.round as number
+              const totalRounds = msg.data.total_rounds as number
+              store.setRound(round + 1, totalRounds)
               break
             }
             case "survey_done": {

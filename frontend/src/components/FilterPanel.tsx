@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import type { FilterOptions, Filters } from "@/types"
-import { X, AlertTriangle } from "lucide-react"
+import type { ChatMode, FilterOptions, Filters } from "@/types"
+import { X, AlertTriangle, MessageSquare, Swords } from "lucide-react"
 
 const FILTER_KEYS: { key: keyof Filters; label: string }[] = [
   { key: "role", label: "Role" },
@@ -26,7 +26,7 @@ const FILTER_KEYS: { key: keyof Filters; label: string }[] = [
 ]
 
 export function FilterPanel() {
-  const { filters, setFilter, clearFilters, panelSize, setPanelSize } = useSurveyStore()
+  const { filters, setFilter, clearFilters, panelSize, setPanelSize, chatMode, setChatMode, debateRounds, setDebateRounds } = useSurveyStore()
   const [options, setOptions] = useState<FilterOptions | null>(null)
   const [count, setCount] = useState<number | null>(null)
 
@@ -114,6 +114,57 @@ export function FilterPanel() {
           </div>
         )}
       </div>
+
+      <Separator />
+
+      {/* Chat Mode */}
+      <div className="space-y-2">
+        <Label className="text-xs">Mode</Label>
+        <div className="grid grid-cols-2 gap-1">
+          {([
+            { value: "survey" as ChatMode, label: "Survey", icon: MessageSquare },
+            { value: "debate" as ChatMode, label: "Debate", icon: Swords },
+          ]).map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              onClick={() => setChatMode(value)}
+              className={`flex items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors ${
+                chatMode === value
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-input hover:bg-accent"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted-foreground">
+          {chatMode === "survey"
+            ? "Each panelist answers independently."
+            : "Panelists see prior round results and can shift positions."}
+        </p>
+      </div>
+
+      {/* Debate Rounds (only in debate mode) */}
+      {chatMode === "debate" && (
+        <div className="space-y-2">
+          <div className="flex items-baseline gap-1">
+            <Label className="text-xs">Rounds:</Label>
+            <span className="text-xs font-semibold tabular-nums">{debateRounds}</span>
+          </div>
+          <Slider
+            value={[debateRounds]}
+            onValueChange={([v]) => setDebateRounds(v)}
+            min={2}
+            max={10}
+            step={1}
+          />
+          <p className="text-[10px] text-muted-foreground">
+            Number of debate rounds before final results.
+          </p>
+        </div>
+      )}
 
       <Separator />
 

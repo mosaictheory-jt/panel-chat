@@ -1,6 +1,7 @@
 import { create } from "zustand"
 import type {
   ApiKeys,
+  ChatMode,
   CompletedSurvey,
   QuestionBreakdown,
   Respondent,
@@ -16,6 +17,9 @@ const STORAGE_KEY_GOOGLE = "panel-chat-key-google"
 const STORAGE_KEY_MODELS = "panel-chat-selected-models"
 const STORAGE_KEY_ANALYZER = "panel-chat-analyzer-model"
 const STORAGE_KEY_TEMPERATURES = "panel-chat-model-temps"
+const STORAGE_KEY_MEMORY = "panel-chat-persona-memory"
+const STORAGE_KEY_MODE = "panel-chat-mode"
+const STORAGE_KEY_DEBATE_ROUNDS = "panel-chat-debate-rounds"
 
 function loadApiKeys(): ApiKeys {
   return {
@@ -56,6 +60,9 @@ interface SurveyState {
   analyzerModel: string
   panelSize: number
   settingsOpen: boolean
+  personaMemory: boolean
+  chatMode: ChatMode
+  debateRounds: number
   setApiKey: (provider: keyof ApiKeys, key: string) => void
   setSelectedModels: (models: string[]) => void
   setAnalyzerModel: (model: string) => void
@@ -63,6 +70,9 @@ interface SurveyState {
   setModelTemperature: (model: string, temp: number) => void
   setPanelSize: (size: number) => void
   setSettingsOpen: (open: boolean) => void
+  setPersonaMemory: (enabled: boolean) => void
+  setChatMode: (mode: ChatMode) => void
+  setDebateRounds: (rounds: number) => void
   hasRequiredSettings: () => boolean
 
   // Filters
@@ -78,6 +88,8 @@ interface SurveyState {
   surveyModels: string[]
   breakdown: QuestionBreakdown | null
   responses: SurveyResponse[]
+  currentRound: number
+  totalRounds: number
   error: string | null
 
   // Actions
@@ -85,6 +97,7 @@ interface SurveyState {
   setBreakdown: (breakdown: QuestionBreakdown) => void
   startRunning: () => void
   addResponse: (response: SurveyResponse) => void
+  setRound: (round: number, totalRounds: number) => void
   setSurveyDone: () => void
   setError: (error: string) => void
   reset: () => void
@@ -117,6 +130,9 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
   analyzerModel: localStorage.getItem(STORAGE_KEY_ANALYZER) || "",
   panelSize: 5,
   settingsOpen: !loadApiKeys().anthropic && !loadApiKeys().openai && !loadApiKeys().google,
+  personaMemory: localStorage.getItem(STORAGE_KEY_MEMORY) !== "false",
+  chatMode: (localStorage.getItem(STORAGE_KEY_MODE) as ChatMode) || "survey",
+  debateRounds: parseInt(localStorage.getItem(STORAGE_KEY_DEBATE_ROUNDS) ?? "3", 10),
 
   setApiKey: (provider, key) => {
     const storageMap: Record<keyof ApiKeys, string> = {
@@ -154,6 +170,21 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
 
   setSettingsOpen: (open) => set({ settingsOpen: open }),
 
+  setPersonaMemory: (enabled) => {
+    localStorage.setItem(STORAGE_KEY_MEMORY, String(enabled))
+    set({ personaMemory: enabled })
+  },
+
+  setChatMode: (mode) => {
+    localStorage.setItem(STORAGE_KEY_MODE, mode)
+    set({ chatMode: mode })
+  },
+
+  setDebateRounds: (rounds) => {
+    localStorage.setItem(STORAGE_KEY_DEBATE_ROUNDS, String(rounds))
+    set({ debateRounds: rounds })
+  },
+
   hasRequiredSettings: () => {
     const state = get()
     const hasKey = Object.values(state.apiKeys).some((k) => k.length > 0)
@@ -182,6 +213,8 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
   surveyModels: [],
   breakdown: null,
   responses: [],
+  currentRound: 0,
+  totalRounds: 1,
   error: null,
 
   startAnalysis: (id, question, panel, models) =>
@@ -193,6 +226,8 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
       surveyModels: models,
       breakdown: null,
       responses: [],
+      currentRound: 0,
+      totalRounds: 1,
       error: null,
     }),
 
@@ -206,6 +241,9 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
     set((state) => ({
       responses: [...state.responses, response],
     })),
+
+  setRound: (round, totalRounds) =>
+    set({ currentRound: round, totalRounds }),
 
   setSurveyDone: () => {
     const state = get()
@@ -244,6 +282,8 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
       surveyModels: [],
       breakdown: null,
       responses: [],
+      currentRound: 0,
+      totalRounds: 1,
       error: null,
     }),
 

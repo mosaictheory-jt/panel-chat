@@ -1,4 +1,4 @@
-import type { ApiKeys, WSMessage } from "@/types"
+import type { ApiKeys, ChatMode, WSMessage } from "@/types"
 
 function getWsBase(): string {
   const envUrl = import.meta.env.VITE_WS_URL
@@ -14,6 +14,11 @@ export function connectSurveyWS(
   surveyId: string,
   apiKeys: ApiKeys,
   temperatures: Record<string, number>,
+  options: {
+    personaMemory: boolean
+    chatMode: ChatMode
+    numRounds: number
+  },
   onMessage: (msg: WSMessage) => void,
   onClose?: () => void,
   onError?: (err: Event) => void,
@@ -26,7 +31,13 @@ export function connectSurveyWS(
     for (const [provider, key] of Object.entries(apiKeys)) {
       if (key) keysToSend[provider] = key
     }
-    ws.send(JSON.stringify({ api_keys: keysToSend, temperatures }))
+    ws.send(JSON.stringify({
+      api_keys: keysToSend,
+      temperatures,
+      persona_memory: options.personaMemory,
+      chat_mode: options.chatMode,
+      num_rounds: options.numRounds,
+    }))
   }
 
   ws.onmessage = (event) => {

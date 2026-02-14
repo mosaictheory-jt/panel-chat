@@ -10,6 +10,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
+import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 
 import {
@@ -35,6 +36,8 @@ export function SettingsModal() {
     setAnalyzerModel,
     modelTemperatures,
     setModelTemperature,
+    personaMemory,
+    setPersonaMemory,
   } = useSurveyStore()
 
   const toggleModel = (modelValue: string) => {
@@ -172,6 +175,20 @@ export function SettingsModal() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Persona Memory */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="space-y-0.5">
+              <Label className="text-sm">Persona Memory</Label>
+              <p className="text-xs text-muted-foreground">
+                Personas recall their past survey answers when responding.
+              </p>
+            </div>
+            <Switch
+              checked={personaMemory}
+              onCheckedChange={setPersonaMemory}
+            />
           </div>
 
         </div>

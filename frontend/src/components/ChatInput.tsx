@@ -9,9 +9,16 @@ export function ChatInput() {
   const { startSurvey } = useSurvey()
   const phase = useSurveyStore((s) => s.phase)
   const hasSettings = useSurveyStore((s) => s.hasRequiredSettings())
+  const chatMode = useSurveyStore((s) => s.chatMode)
 
   const isBusy = phase === "analyzing" || phase === "running"
   const disabled = isBusy || !hasSettings
+
+  const placeholder = !hasSettings
+    ? "Configure API keys in settings"
+    : chatMode === "debate"
+      ? "Ask a question for the panel to debate..."
+      : "Ask the panel a question..."
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,7 +38,7 @@ export function ChatInput() {
         type="text"
         value={input}
         onChange={(e) => setInput(e.target.value)}
-        placeholder={hasSettings ? "Ask the panel a question..." : "Configure API keys in settings"}
+        placeholder={placeholder}
         disabled={disabled}
         className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
       />

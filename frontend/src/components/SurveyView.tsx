@@ -37,6 +37,9 @@ export function SurveyView() {
     completedSurveys,
     visibleSurveyIds,
     removeSurveyFromResults,
+    chatMode,
+    currentRound,
+    totalRounds,
   } = useSurveyStore()
 
   const [selectedRespondent, setSelectedRespondent] = useState<Respondent | null>(null)
@@ -162,8 +165,14 @@ export function SurveyView() {
     }
   }, [phase === "running"])
 
-  const progressPercent = totalExpected > 0
-    ? Math.round((responses.length / totalExpected) * 100)
+  const isDebate = chatMode === "debate" && totalRounds > 1
+  const responsesPerRound = totalExpected
+  const currentRoundResponses = isDebate
+    ? responses.filter((r) => r.round === currentRound).length
+    : responses.length
+  const currentRoundTotal = isDebate ? responsesPerRound : totalExpected
+  const progressPercent = currentRoundTotal > 0
+    ? Math.round((currentRoundResponses / currentRoundTotal) * 100)
     : 0
 
   // Idle — empty state
@@ -223,10 +232,20 @@ export function SurveyView() {
                 {responses.length} responses
               </Badge>
             )}
-            {phase === "running" && (
+            {phase === "running" && !isDebate && (
               <Badge className="text-xs bg-blue-500/10 text-blue-700 border-blue-500/30">
                 {responses.length} / {totalExpected} responses
               </Badge>
+            )}
+            {phase === "running" && isDebate && (
+              <>
+                <Badge className="text-xs bg-purple-500/10 text-purple-700 border-purple-500/30">
+                  Round {currentRound} / {totalRounds}
+                </Badge>
+                <Badge className="text-xs bg-blue-500/10 text-blue-700 border-blue-500/30">
+                  {currentRoundResponses} / {currentRoundTotal} this round
+                </Badge>
+              </>
             )}
             {(phase === "running" || phase === "complete") && breakdown && (
               <CostBadge
@@ -282,7 +301,11 @@ export function SurveyView() {
             {phase === "running" && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{responses.length} of {totalExpected} responses collected</span>
+                  <span>
+                    {isDebate
+                      ? `Round ${currentRound}: ${currentRoundResponses} of ${currentRoundTotal} responses`
+                      : `${responses.length} of ${totalExpected} responses collected`}
+                  </span>
                   <span className="font-medium tabular-nums">{progressPercent}%</span>
                 </div>
                 <Progress value={progressPercent} className="h-2" />
