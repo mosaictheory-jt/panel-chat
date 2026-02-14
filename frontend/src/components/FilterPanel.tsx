@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useSurveyStore } from "@/store/surveyStore"
 import { getFilterOptions, getRespondentCount } from "@/api/client"
 import { Label } from "@/components/ui/label"
@@ -44,6 +44,26 @@ export function FilterPanel() {
     getRespondentCount(activeFilters).then((r) => setCount(r.count)).catch(console.error)
   }, [filters])
 
+  const [editingSize, setEditingSize] = useState(false)
+  const [editValue, setEditValue] = useState("")
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const maxSize = Math.min(count ?? 1136, 1136)
+
+  const startEditing = () => {
+    setEditValue(String(panelSize))
+    setEditingSize(true)
+    requestAnimationFrame(() => inputRef.current?.select())
+  }
+
+  const commitEdit = () => {
+    const v = parseInt(editValue, 10)
+    if (!isNaN(v) && v >= 1 && v <= maxSize) {
+      setPanelSize(v)
+    }
+    setEditingSize(false)
+  }
+
   if (!options) return null
 
   const hasFilters = Object.values(filters).some((v) => v && v.length > 0)
@@ -52,16 +72,43 @@ export function FilterPanel() {
     <div className="space-y-3">
       {/* Panel Size */}
       <div className="space-y-2">
-        <Label className="text-xs">Panel Size: {panelSize}</Label>
+        <div className="flex items-baseline gap-1">
+          <Label className="text-xs">Panel Size:</Label>
+          {editingSize ? (
+            <input
+              ref={inputRef}
+              type="number"
+              min={1}
+              max={maxSize}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onBlur={commitEdit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitEdit()
+                if (e.key === "Escape") setEditingSize(false)
+              }}
+              className="w-14 bg-transparent border-b border-primary text-xs font-semibold outline-none tabular-nums px-0.5 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              autoFocus
+            />
+          ) : (
+            <button
+              onClick={startEditing}
+              className="text-xs font-semibold tabular-nums hover:text-primary border-b border-transparent hover:border-primary transition-colors cursor-text"
+              title="Click to type a value"
+            >
+              {panelSize}
+            </button>
+          )}
+        </div>
         <Slider
           value={[panelSize]}
           onValueChange={([v]) => setPanelSize(v)}
-          min={2}
-          max={Math.min(count ?? 100, 1136)}
+          min={1}
+          max={maxSize}
           step={panelSize < 12 ? 1 : panelSize < 50 ? 2 : panelSize < 200 ? 10 : 50}
         />
         {panelSize > 20 && (
-          <div className="flex items-start gap-1.5 text-[10px] text-yellow-600">
+          <div className="flex items-start gap-1.5 text-[10px] text-yellow-600 dark:text-yellow-400">
             <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
             <span>Large panels use more API credits</span>
           </div>

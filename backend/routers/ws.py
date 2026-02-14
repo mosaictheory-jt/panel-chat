@@ -25,6 +25,7 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
         init_raw = await websocket.receive_text()
         init_msg = json.loads(init_raw)
         api_keys = init_msg.get("api_keys", {})
+        temperatures = init_msg.get("temperatures", {})
         if not api_keys or not any(api_keys.values()):
             await websocket.send_json({"type": "error", "data": {"message": "At least one API key required"}})
             await websocket.close()
@@ -56,6 +57,7 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
             "panel": session.panel,
             "models": session.models,
             "api_keys": api_keys,
+            "temperatures": temperatures,
             "survey_id": survey_id,
             "responses": [],
         }
@@ -106,6 +108,7 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
                                 "agent_name": resp["agent_name"],
                                 "model": resp["model"],
                                 "answers": resp["answers"],
+                                "token_usage": resp.get("token_usage"),
                             },
                         })
 

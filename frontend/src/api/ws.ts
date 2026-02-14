@@ -5,6 +5,7 @@ const WS_BASE = "ws://localhost:8000"
 export function connectSurveyWS(
   surveyId: string,
   apiKeys: ApiKeys,
+  temperatures: Record<string, number>,
   onMessage: (msg: WSMessage) => void,
   onClose?: () => void,
   onError?: (err: Event) => void,
@@ -17,7 +18,7 @@ export function connectSurveyWS(
     for (const [provider, key] of Object.entries(apiKeys)) {
       if (key) keysToSend[provider] = key
     }
-    ws.send(JSON.stringify({ api_keys: keysToSend }))
+    ws.send(JSON.stringify({ api_keys: keysToSend, temperatures }))
   }
 
   ws.onmessage = (event) => {

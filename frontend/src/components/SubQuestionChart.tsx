@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import {
   BarChart,
   Bar,
@@ -9,20 +9,15 @@ import {
   Pie,
   Cell,
   ResponsiveContainer,
-  Legend,
 } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { BarChart3, PieChart as PieChartIcon } from "lucide-react"
 import type { SubQuestion, SurveyResponse } from "@/types"
-
-const COLORS = [
-  "#6366f1", "#8b5cf6", "#a855f7", "#d946ef",
-  "#ec4899", "#f43f5e", "#f97316", "#eab308",
-  "#22c55e", "#14b8a6", "#06b6d4", "#3b82f6",
-]
 
 interface SubQuestionChartProps {
   subQuestion: SubQuestion
   responses: SurveyResponse[]
+  colors: string[]
   selectedOption: string | null
   onOptionClick: (subQuestionId: string, option: string | null) => void
 }
@@ -30,9 +25,12 @@ interface SubQuestionChartProps {
 export function SubQuestionChart({
   subQuestion,
   responses,
+  colors,
   selectedOption,
   onOptionClick,
 }: SubQuestionChartProps) {
+  const [chartType, setChartType] = useState<"bar" | "pie">(subQuestion.chart_type)
+
   const chartData = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const opt of subQuestion.answer_options) {
@@ -44,11 +42,17 @@ export function SubQuestionChart({
         counts[chosen]++
       }
     }
-    return subQuestion.answer_options.map((opt) => ({
+    return subQuestion.answer_options.map((opt, i) => ({
       name: opt,
       count: counts[opt],
+      fill: colors[i % colors.length],
     }))
-  }, [subQuestion, responses])
+  }, [subQuestion, responses, colors])
+
+  const totalResponses = useMemo(
+    () => chartData.reduce((sum, d) => sum + d.count, 0),
+    [chartData]
+  )
 
   const uniqueModels = useMemo(() => {
     const models = new Set(responses.map((r) => r.model))
@@ -68,34 +72,64 @@ export function SubQuestionChart({
     })
   }, [subQuestion, responses, uniqueModels])
 
-  const useGroupedBar = modelChartData && uniqueModels.length > 1
+  const useGroupedBar = chartType === "bar" && modelChartData && uniqueModels.length > 1
 
   const handleBarClick = (data: { name?: string; payload?: { name?: string } }) => {
     const name = data?.name ?? data?.payload?.name
     if (!name) return
-    if (name === selectedOption) {
-      onOptionClick(subQuestion.id, null)
-    } else {
-      onOptionClick(subQuestion.id, name)
-    }
+    onOptionClick(subQuestion.id, name === selectedOption ? null : name)
   }
 
   const handlePieClick = (_: unknown, index: number) => {
     const opt = subQuestion.answer_options[index]
     if (!opt) return
-    if (opt === selectedOption) {
-      onOptionClick(subQuestion.id, null)
-    } else {
-      onOptionClick(subQuestion.id, opt)
-    }
+    onOptionClick(subQuestion.id, opt === selectedOption ? null : opt)
   }
 
   const isActive = selectedOption !== null
 
+  const tooltipStyles = {
+    contentStyle: {
+      backgroundColor: "var(--popover)",
+      border: "1px solid var(--border)",
+      borderRadius: "8px",
+      fontSize: "12px",
+      color: "var(--popover-foreground)",
+    },
+    labelStyle: { color: "var(--popover-foreground)" },
+    itemStyle: { color: "var(--popover-foreground)" },
+  }
+
   return (
     <Card className={isActive ? "ring-2 ring-primary/30" : ""}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">{subQuestion.text}</CardTitle>
+        <div className="flex items-start justify-between gap-2">
+          <CardTitle className="text-sm font-medium flex-1">{subQuestion.text}</CardTitle>
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button
+              onClick={() => setChartType("bar")}
+              className={`p-1 rounded transition-colors ${
+                chartType === "bar"
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="Bar chart"
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setChartType("pie")}
+              className={`p-1 rounded transition-colors ${
+                chartType === "pie"
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="Pie chart"
+            >
+              <PieChartIcon className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
         {selectedOption && (
           <button
             onClick={() => onOptionClick(subQuestion.id, null)}
@@ -105,45 +139,50 @@ export function SubQuestionChart({
           </button>
         )}
       </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={250}>
-          {subQuestion.chart_type === "pie" ? (
+      <CardContent className="space-y-3">
+        <ResponsiveContainer width="100%" height={220}>
+          {chartType === "pie" ? (
             <PieChart>
               <Pie
                 data={chartData}
                 cx="50%"
                 cy="50%"
                 outerRadius={80}
+                innerRadius={40}
                 dataKey="count"
                 nameKey="name"
-                label={({ name, count }) => count > 0 ? `${name}: ${count}` : ""}
                 cursor="pointer"
                 onClick={handlePieClick}
+                paddingAngle={2}
               >
                 {chartData.map((entry, index) => (
                   <Cell
                     key={index}
-                    fill={COLORS[index % COLORS.length]}
+                    fill={colors[index % colors.length]}
                     opacity={selectedOption && entry.name !== selectedOption ? 0.3 : 1}
-                    stroke={entry.name === selectedOption ? "#000" : undefined}
+                    stroke={entry.name === selectedOption ? "var(--foreground)" : "transparent"}
                     strokeWidth={entry.name === selectedOption ? 2 : 0}
                   />
                 ))}
               </Pie>
-              <Tooltip />
-              <Legend />
+              <Tooltip
+                {...tooltipStyles}
+                formatter={(value: number, name: string) => [
+                  `${value} (${totalResponses > 0 ? Math.round((value / totalResponses) * 100) : 0}%)`,
+                  name,
+                ]}
+              />
             </PieChart>
           ) : useGroupedBar ? (
             <BarChart data={modelChartData} onClick={(e) => e?.activePayload?.[0] && handleBarClick(e.activePayload[0])}>
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} angle={-20} textAnchor="end" height={60} />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Legend />
+              <XAxis dataKey="name" tick={false} height={8} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 10 }} width={30} />
+              <Tooltip {...tooltipStyles} />
               {uniqueModels.map((model, i) => (
                 <Bar
                   key={model}
                   dataKey={model}
-                  fill={COLORS[i % COLORS.length]}
+                  fill={colors[i % colors.length]}
                   radius={[4, 4, 0, 0]}
                   cursor="pointer"
                 />
@@ -151,14 +190,20 @@ export function SubQuestionChart({
             </BarChart>
           ) : (
             <BarChart data={chartData} onClick={(e) => e?.activePayload?.[0] && handleBarClick(e.activePayload[0].payload)}>
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} angle={-20} textAnchor="end" height={60} />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
+              <XAxis dataKey="name" tick={false} height={8} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 10 }} width={30} />
+              <Tooltip
+                {...tooltipStyles}
+                formatter={(value: number) => [
+                  `${value} (${totalResponses > 0 ? Math.round((value / totalResponses) * 100) : 0}%)`,
+                  "Responses",
+                ]}
+              />
               <Bar dataKey="count" radius={[4, 4, 0, 0]} cursor="pointer">
                 {chartData.map((entry, index) => (
                   <Cell
                     key={index}
-                    fill={COLORS[index % COLORS.length]}
+                    fill={colors[index % colors.length]}
                     opacity={selectedOption && entry.name !== selectedOption ? 0.3 : 1}
                   />
                 ))}
@@ -166,6 +211,33 @@ export function SubQuestionChart({
             </BarChart>
           )}
         </ResponsiveContainer>
+
+        {/* Legend with counts */}
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          {chartData.map((entry, index) => {
+            const pct = totalResponses > 0 ? Math.round((entry.count / totalResponses) * 100) : 0
+            const isSelected = entry.name === selectedOption
+            const isDimmed = selectedOption && !isSelected
+            return (
+              <button
+                key={entry.name}
+                onClick={() => onOptionClick(subQuestion.id, isSelected ? null : entry.name)}
+                className={`flex items-center gap-1.5 text-[10px] leading-tight transition-opacity ${
+                  isDimmed ? "opacity-40" : "opacity-100"
+                } hover:opacity-100`}
+                title={`${entry.name}: ${entry.count} responses (${pct}%)`}
+              >
+                <span
+                  className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                  style={{ backgroundColor: colors[index % colors.length] }}
+                />
+                <span className="truncate max-w-[120px]">{entry.name}</span>
+                <span className="font-semibold tabular-nums">{entry.count}</span>
+                <span className="text-muted-foreground">({pct}%)</span>
+              </button>
+            )
+          })}
+        </div>
       </CardContent>
     </Card>
   )

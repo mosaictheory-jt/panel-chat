@@ -1,5 +1,5 @@
 import { useSurveyStore } from "@/store/surveyStore"
-import { MODEL_OPTIONS, PROVIDER_NAMES, getProviderKey } from "@/types"
+import { MODEL_OPTIONS, PROVIDER_NAMES, getProviderKey, getModelMaxTemp } from "@/types"
 import type { ProviderName } from "@/types"
 import {
   Dialog,
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
+
 import {
   Select,
   SelectContent,
@@ -20,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { AlertTriangle, Check } from "lucide-react"
+import { Check, Thermometer } from "lucide-react"
 
 export function SettingsModal() {
   const {
@@ -32,8 +33,8 @@ export function SettingsModal() {
     setSelectedModels,
     analyzerModel,
     setAnalyzerModel,
-    panelSize,
-    setPanelSize,
+    modelTemperatures,
+    setModelTemperature,
   } = useSurveyStore()
 
   const toggleModel = (modelValue: string) => {
@@ -41,7 +42,15 @@ export function SettingsModal() {
       setSelectedModels(selectedModels.filter((m) => m !== modelValue))
     } else {
       setSelectedModels([...selectedModels, modelValue])
+      // Set default temperature to max if not already set
+      if (modelTemperatures[modelValue] === undefined) {
+        setModelTemperature(modelValue, getModelMaxTemp(modelValue))
+      }
     }
+  }
+
+  const getTemp = (modelValue: string): number => {
+    return modelTemperatures[modelValue] ?? getModelMaxTemp(modelValue)
   }
 
   return (
@@ -72,7 +81,7 @@ export function SettingsModal() {
             Keys are stored locally and sent directly to providers. Only configure the providers you want to use.
           </p>
 
-          {/* Response Models — multi-select checkboxes */}
+          {/* Response Models — multi-select checkboxes with temperature */}
           <div className="space-y-2">
             <Label className="text-sm">Response Models</Label>
             <p className="text-xs text-muted-foreground mb-2">
@@ -90,28 +99,48 @@ export function SettingsModal() {
                     </p>
                     {providerModels.map((m) => {
                       const isSelected = selectedModels.includes(m.value)
+                      const temp = getTemp(m.value)
                       return (
-                        <button
-                          key={m.value}
-                          onClick={() => toggleModel(m.value)}
-                          disabled={!hasKey}
-                          className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-left transition-colors ${
-                            isSelected
-                              ? "bg-primary/10 text-primary"
-                              : "hover:bg-accent"
-                          } ${!hasKey ? "opacity-50 cursor-not-allowed" : ""}`}
-                        >
-                          <div
-                            className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                        <div key={m.value}>
+                          <button
+                            onClick={() => toggleModel(m.value)}
+                            disabled={!hasKey}
+                            className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-left transition-colors ${
                               isSelected
-                                ? "bg-primary border-primary"
-                                : "border-input"
-                            }`}
+                                ? "bg-primary/10 text-primary"
+                                : "hover:bg-accent"
+                            } ${!hasKey ? "opacity-50 cursor-not-allowed" : ""}`}
                           >
-                            {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
-                          </div>
-                          {m.label}
-                        </button>
+                            <div
+                              className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                                isSelected
+                                  ? "bg-primary border-primary"
+                                  : "border-input"
+                              }`}
+                            >
+                              {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
+                            </div>
+                            {m.label}
+                          </button>
+
+                          {/* Temperature slider — shown when model is selected */}
+                          {isSelected && (
+                            <div className="flex items-center gap-3 pl-8 pr-2 py-1.5">
+                              <Thermometer className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                              <Slider
+                                value={[temp]}
+                                onValueChange={([v]) => setModelTemperature(m.value, v)}
+                                min={0}
+                                max={m.maxTemp}
+                                step={0.1}
+                                className="flex-1"
+                              />
+                              <span className="text-xs tabular-nums w-8 text-right text-muted-foreground">
+                                {temp.toFixed(1)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       )
                     })}
                   </div>
@@ -145,23 +174,6 @@ export function SettingsModal() {
             </Select>
           </div>
 
-          {/* Panel Size */}
-          <div className="space-y-2">
-            <Label className="text-sm">Panel Size: {panelSize}</Label>
-            <Slider
-              value={[panelSize]}
-              onValueChange={([v]) => setPanelSize(v)}
-              min={2}
-              max={1136}
-              step={panelSize < 12 ? 1 : panelSize < 50 ? 2 : panelSize < 200 ? 10 : 50}
-            />
-            {panelSize > 20 && (
-              <div className="flex items-start gap-2 rounded-md border border-yellow-500/50 bg-yellow-500/10 p-2 text-xs text-yellow-700 dark:text-yellow-400">
-                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>Large panels will be slow and use significant API credits</span>
-              </div>
-            )}
-          </div>
         </div>
 
         <Button onClick={() => setSettingsOpen(false)} className="w-full">

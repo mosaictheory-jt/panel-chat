@@ -15,6 +15,7 @@ const STORAGE_KEY_OPENAI = "panel-chat-key-openai"
 const STORAGE_KEY_GOOGLE = "panel-chat-key-google"
 const STORAGE_KEY_MODELS = "panel-chat-selected-models"
 const STORAGE_KEY_ANALYZER = "panel-chat-analyzer-model"
+const STORAGE_KEY_TEMPERATURES = "panel-chat-model-temps"
 
 function loadApiKeys(): ApiKeys {
   return {
@@ -36,6 +37,18 @@ function loadSelectedModels(): string[] {
   return []
 }
 
+function loadModelTemperatures(): Record<string, number> {
+  const stored = localStorage.getItem(STORAGE_KEY_TEMPERATURES)
+  if (stored) {
+    try {
+      return JSON.parse(stored)
+    } catch {
+      return {}
+    }
+  }
+  return {}
+}
+
 interface SurveyState {
   // Settings
   apiKeys: ApiKeys
@@ -46,6 +59,8 @@ interface SurveyState {
   setApiKey: (provider: keyof ApiKeys, key: string) => void
   setSelectedModels: (models: string[]) => void
   setAnalyzerModel: (model: string) => void
+  modelTemperatures: Record<string, number>
+  setModelTemperature: (model: string, temp: number) => void
   setPanelSize: (size: number) => void
   setSettingsOpen: (open: boolean) => void
   hasRequiredSettings: () => boolean
@@ -123,6 +138,16 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
   setAnalyzerModel: (model) => {
     localStorage.setItem(STORAGE_KEY_ANALYZER, model)
     set({ analyzerModel: model })
+  },
+
+  modelTemperatures: loadModelTemperatures(),
+
+  setModelTemperature: (model, temp) => {
+    set((state) => {
+      const updated = { ...state.modelTemperatures, [model]: temp }
+      localStorage.setItem(STORAGE_KEY_TEMPERATURES, JSON.stringify(updated))
+      return { modelTemperatures: updated }
+    })
   },
 
   setPanelSize: (size) => set({ panelSize: size }),

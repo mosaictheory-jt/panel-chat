@@ -9,6 +9,7 @@ class SurveyAgentState(TypedDict):
     question: str
     model: str
     api_key: str
+    temperature: float | None
     survey_id: str
 
 
@@ -18,5 +19,6 @@ class SurveyState(TypedDict):
     panel: list[dict]
     models: list[str]
     api_keys: dict[str, str]  # provider -> key
+    temperatures: dict[str, float]  # model -> temperature
     survey_id: str
     responses: Annotated[list[dict], operator.add]

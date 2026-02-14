@@ -4,6 +4,7 @@ import { BreakdownEditor } from "./BreakdownEditor"
 import { ResultsView } from "./ResultsView"
 import { ResponseCard } from "./ResponseCard"
 import { PersonaDetail } from "./PersonaDetail"
+import { CostBadge } from "./CostBadge"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -226,6 +227,16 @@ export function SurveyView() {
               <Badge className="text-xs bg-blue-500/10 text-blue-700 border-blue-500/30">
                 {responses.length} / {totalExpected} responses
               </Badge>
+            )}
+            {(phase === "running" || phase === "complete") && breakdown && (
+              <CostBadge
+                responses={responses}
+                models={surveyModels}
+                panelSize={panel.length}
+                subQuestionCount={breakdown.sub_questions.length}
+                totalExpected={totalExpected}
+                isComplete={phase === "complete"}
+              />
             )}
           </div>
         </div>

@@ -65,6 +65,7 @@ def survey_respond(state: SurveyAgentState) -> dict:
     question = state["question"]
     model = state["model"]
     api_key = state["api_key"]
+    temperature = state.get("temperature")
 
     system_prompt = PERSONA_SYSTEM.format(
         role=respondent.get("role", "Unknown"),
@@ -91,7 +92,7 @@ def survey_respond(state: SurveyAgentState) -> dict:
         sub_questions_text=_format_sub_questions(sub_questions),
     )
 
-    llm = get_llm(model, api_key)
+    llm = get_llm(model, api_key, temperature=temperature)
     response = llm.invoke([
         SystemMessage(content=system_prompt),
         HumanMessage(content=user_prompt),
@@ -99,11 +100,31 @@ def survey_respond(state: SurveyAgentState) -> dict:
 
     answers = _parse_answers(response.content, sub_questions)
 
+    # Extract token usage from response metadata (UsageMetadata is dict-like)
+    token_usage = None
+    usage_meta = getattr(response, "usage_metadata", None)
+    if usage_meta:
+        input_tok = usage_meta.get("input_tokens", 0) if isinstance(usage_meta, dict) else getattr(usage_meta, "input_tokens", 0)
+        output_tok = usage_meta.get("output_tokens", 0) if isinstance(usage_meta, dict) else getattr(usage_meta, "output_tokens", 0)
+        token_usage = {
+            "input_tokens": input_tok or 0,
+            "output_tokens": output_tok or 0,
+        }
+    elif hasattr(response, "response_metadata"):
+        meta = response.response_metadata or {}
+        usage = meta.get("usage") or meta.get("token_usage") or {}
+        if usage:
+            token_usage = {
+                "input_tokens": usage.get("input_tokens") or usage.get("prompt_tokens") or 0,
+                "output_tokens": usage.get("output_tokens") or usage.get("completion_tokens") or 0,
+            }
+
     return {
         "responses": [{
             "respondent_id": respondent["id"],
             "agent_name": agent_name,
             "model": model,
             "answers": answers,
+            "token_usage": token_usage,
         }]
     }

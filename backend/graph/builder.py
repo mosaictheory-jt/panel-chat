@@ -12,6 +12,7 @@ def _fan_out(state: SurveyState) -> list[Send]:
     panel = state["panel"]
     models = state["models"]
     api_keys = state["api_keys"]
+    temperatures = state.get("temperatures", {})
     sub_questions = state["sub_questions"]
     question = state["question"]
     survey_id = state["survey_id"]
@@ -24,6 +25,7 @@ def _fan_out(state: SurveyState) -> list[Send]:
             api_key = api_keys.get(provider, "")
             if not api_key:
                 continue
+            temp = temperatures.get(model)
             sends.append(Send("survey_respond", {
                 "respondent": respondent_dict,
                 "agent_name": respondent.display_name(),
@@ -31,6 +33,7 @@ def _fan_out(state: SurveyState) -> list[Send]:
                 "question": question,
                 "model": model,
                 "api_key": api_key,
+                "temperature": temp,
                 "survey_id": survey_id,
             }))
     return sends

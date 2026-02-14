@@ -76,6 +76,7 @@ export function useSurvey() {
       const ws = connectSurveyWS(
         store.surveyId,
         store.apiKeys,
+        store.modelTemperatures,
         (msg: WSMessage) => {
           switch (msg.type) {
             case "survey_response": {

@@ -2,16 +2,26 @@ import { useMemo, useState } from "react"
 import { SubQuestionChart } from "./SubQuestionChart"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { getAvatar } from "@/lib/avatar"
-import { X, EyeOff } from "lucide-react"
+import {
+  CHART_THEMES,
+  getChartTheme,
+  getStoredChartThemeId,
+  storeChartThemeId,
+} from "@/lib/chartThemes"
+import { computeActualCost, formatCost } from "@/lib/pricing"
+import { X, EyeOff, Palette, DollarSign } from "lucide-react"
 import type { CompletedSurvey, Respondent } from "@/types"
 
 interface ResultsViewProps {
-  /** All survey datasets to display, in order */
   surveys: CompletedSurvey[]
-  /** Called when user wants to hide a survey from the results */
   onHideSurvey?: (surveyId: string) => void
-  /** Called when user clicks a respondent in drill-down */
   onRespondentClick?: (respondent: Respondent) => void
 }
 
@@ -20,12 +30,21 @@ export function ResultsView({
   onHideSurvey,
   onRespondentClick,
 }: ResultsViewProps) {
-  // Track which chart + option is selected for drill-down, scoped by survey
   const [drillDown, setDrillDown] = useState<{
     surveyId: string
     sqId: string
     option: string
   } | null>(null)
+
+  const [themeId, setThemeId] = useState(getStoredChartThemeId)
+  const [themePanelOpen, setThemePanelOpen] = useState(false)
+
+  const chartTheme = getChartTheme(themeId)
+
+  const handleThemeChange = (id: string) => {
+    setThemeId(id)
+    storeChartThemeId(id)
+  }
 
   const handleOptionClick = (surveyId: string, sqId: string, option: string | null) => {
     if (!option) {
@@ -44,11 +63,56 @@ export function ResultsView({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Theme picker */}
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 gap-1.5 text-xs"
+          onClick={() => setThemePanelOpen(!themePanelOpen)}
+        >
+          <Palette className="w-3.5 h-3.5" />
+          {chartTheme.name}
+        </Button>
+      </div>
+
+      {themePanelOpen && (
+        <div className="rounded-lg border bg-card p-3 space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Chart Color Theme</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+            {CHART_THEMES.map((theme) => (
+              <button
+                key={theme.id}
+                onClick={() => handleThemeChange(theme.id)}
+                className={`rounded-lg border p-2 text-left transition-all hover:shadow-sm ${
+                  theme.id === themeId
+                    ? "ring-2 ring-primary border-primary"
+                    : "border-border hover:border-foreground/20"
+                }`}
+              >
+                <div className="flex gap-0.5 mb-1.5">
+                  {theme.colors.slice(0, 6).map((color, i) => (
+                    <span
+                      key={i}
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+                <p className="text-[10px] font-medium">{theme.name}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Survey result groups */}
       {surveys.map((survey) => (
         <SurveyResultGroup
           key={survey.id}
           survey={survey}
+          colors={chartTheme.colors}
           drillDown={drillDown?.surveyId === survey.id ? drillDown : null}
           onOptionClick={(sqId, option) => handleOptionClick(survey.id, sqId, option)}
           onHide={() => onHideSurvey?.(survey.id)}
@@ -61,6 +125,7 @@ export function ResultsView({
 
 interface SurveyResultGroupProps {
   survey: CompletedSurvey
+  colors: string[]
   drillDown: { sqId: string; option: string } | null
   onOptionClick: (sqId: string, option: string | null) => void
   onHide: () => void
@@ -69,6 +134,7 @@ interface SurveyResultGroupProps {
 
 function SurveyResultGroup({
   survey,
+  colors,
   drillDown,
   onOptionClick,
   onHide,
@@ -93,15 +159,50 @@ function SurveyResultGroup({
     ? survey.breakdown.sub_questions.find((sq) => sq.id === drillDown.sqId)
     : null
 
+  const surveyCost = useMemo(
+    () => computeActualCost(survey.responses),
+    [survey.responses],
+  )
+
+  const providerEntries = Object.entries(surveyCost.perProvider)
+
   return (
     <div className="space-y-4">
       {/* Survey group header */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-sm leading-tight">{survey.question}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {survey.responses.length} responses · {survey.panel.length} panelists
-          </p>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <p className="text-xs text-muted-foreground">
+              {survey.responses.length} responses · {survey.panel.length} panelists
+            </p>
+            {surveyCost.totalCost > 0 && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground cursor-default">
+                      <DollarSign className="w-3 h-3" />
+                      <span className="tabular-nums">{formatCost(surveyCost.totalCost)}</span>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs space-y-1 max-w-64">
+                    <p className="font-semibold">Actual cost</p>
+                    {providerEntries.map(([provider, data]) => (
+                      <div key={provider} className="flex justify-between gap-4">
+                        <span>{provider} ({data.calls} calls)</span>
+                        <span className="tabular-nums font-medium">{formatCost(data.totalCost)}</span>
+                      </div>
+                    ))}
+                    <p className="text-muted-foreground border-t pt-1">
+                      Input: {formatCost(providerEntries.reduce((s, [, d]) => s + d.inputCost, 0))}
+                      {" · "}
+                      Output: {formatCost(providerEntries.reduce((s, [, d]) => s + d.outputCost, 0))}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
         </div>
         <Button
           variant="ghost"
@@ -121,6 +222,7 @@ function SurveyResultGroup({
             key={sq.id}
             subQuestion={sq}
             responses={survey.responses}
+            colors={colors}
             selectedOption={drillDown?.sqId === sq.id ? drillDown.option : null}
             onOptionClick={(sqId, option) => onOptionClick(sqId, option)}
           />

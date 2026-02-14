@@ -51,6 +51,11 @@ export interface QuestionBreakdown {
   sub_questions: SubQuestion[]
 }
 
+export interface TokenUsage {
+  input_tokens: number
+  output_tokens: number
+}
+
 export interface SurveyResponse {
   id: string
   survey_id: string
@@ -58,6 +63,7 @@ export interface SurveyResponse {
   agent_name: string
   model: string
   answers: Record<string, string> // sub_question_id -> chosen option
+  token_usage?: TokenUsage | null
 }
 
 export interface SurveySession {
@@ -101,16 +107,26 @@ export interface ApiKeys {
 export type SurveyPhase = "idle" | "analyzing" | "reviewing" | "running" | "complete"
 
 export const MODEL_OPTIONS = [
-  { value: "claude-opus-4-6", label: "Claude Opus 4.6", provider: "Anthropic" },
-  { value: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5", provider: "Anthropic" },
-  { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", provider: "Anthropic" },
-  { value: "gpt-5.2", label: "GPT-5.2", provider: "OpenAI" },
-  { value: "gpt-4.1", label: "GPT-4.1", provider: "OpenAI" },
-  { value: "gpt-4.1-mini", label: "GPT-4.1 Mini", provider: "OpenAI" },
-  { value: "o3", label: "o3", provider: "OpenAI" },
-  { value: "o3-mini", label: "o3 Mini", provider: "OpenAI" },
-  { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "Google" },
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "Google" },
+  // Anthropic — max temperature 1.0
+  { value: "claude-opus-4-6", label: "Claude Opus 4.6", provider: "Anthropic", maxTemp: 1.0 },
+  { value: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5", provider: "Anthropic", maxTemp: 1.0 },
+  { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", provider: "Anthropic", maxTemp: 1.0 },
+
+  // OpenAI — max temperature 2.0 (reasoning models fixed at 1.0)
+  { value: "gpt-5.2", label: "GPT-5.2", provider: "OpenAI", maxTemp: 2.0 },
+  { value: "gpt-4.1", label: "GPT-4.1", provider: "OpenAI", maxTemp: 2.0 },
+  { value: "gpt-4.1-mini", label: "GPT-4.1 Mini", provider: "OpenAI", maxTemp: 2.0 },
+  { value: "gpt-4.1-nano", label: "GPT-4.1 Nano", provider: "OpenAI", maxTemp: 2.0 },
+  { value: "o3", label: "o3", provider: "OpenAI", maxTemp: 1.0 },
+  { value: "o3-mini", label: "o3 Mini", provider: "OpenAI", maxTemp: 1.0 },
+  { value: "o4-mini", label: "o4 Mini", provider: "OpenAI", maxTemp: 1.0 },
+
+  // Google — max temperature 2.0
+  { value: "gemini-3-pro-preview", label: "Gemini 3 Pro", provider: "Google", maxTemp: 2.0 },
+  { value: "gemini-3-flash-preview", label: "Gemini 3 Flash", provider: "Google", maxTemp: 2.0 },
+  { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "Google", maxTemp: 2.0 },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "Google", maxTemp: 2.0 },
+  { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", provider: "Google", maxTemp: 2.0 },
 ] as const
 
 export const PROVIDER_NAMES = ["Anthropic", "OpenAI", "Google"] as const
@@ -127,4 +143,8 @@ export function getProviderKey(provider: ProviderName): keyof ApiKeys {
 
 export function getModelProvider(modelValue: string): ProviderName {
   return MODEL_OPTIONS.find((m) => m.value === modelValue)?.provider ?? "Anthropic"
+}
+
+export function getModelMaxTemp(modelValue: string): number {
+  return MODEL_OPTIONS.find((m) => m.value === modelValue)?.maxTemp ?? 1.0
 }

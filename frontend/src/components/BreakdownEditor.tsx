@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useSurveyStore } from "@/store/surveyStore"
 import { useSurvey } from "@/hooks/useSurvey"
 import { Button } from "@/components/ui/button"
@@ -6,11 +6,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Trash2, Play, BarChart3, PieChart } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Plus, Trash2, Play, BarChart3, PieChart, DollarSign } from "lucide-react"
+import { estimateSurveyCost, formatCost } from "@/lib/pricing"
 import type { SubQuestion, QuestionBreakdown } from "@/types"
 
 export function BreakdownEditor() {
   const storeBreakdown = useSurveyStore((s) => s.breakdown)
+  const surveyModels = useSurveyStore((s) => s.surveyModels)
+  const panel = useSurveyStore((s) => s.panel)
   const { runSurvey } = useSurvey()
 
   const [subQuestions, setSubQuestions] = useState<SubQuestion[]>(
@@ -104,6 +108,13 @@ export function BreakdownEditor() {
       (sq) => sq.text.trim() && sq.answer_options.length >= 2
     )
 
+  const costEstimate = useMemo(
+    () => estimateSurveyCost(surveyModels, panel.length, subQuestions.length),
+    [surveyModels, panel.length, subQuestions.length],
+  )
+
+  const providerEntries = Object.entries(costEstimate.perProvider)
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -113,10 +124,47 @@ export function BreakdownEditor() {
             Edit the sub-questions and answer options, then run the survey.
           </p>
         </div>
-        <Button onClick={handleRunSurvey} disabled={!isValid} className="gap-2">
-          <Play className="w-4 h-4" />
-          Run Survey
-        </Button>
+        <div className="flex items-center gap-3">
+          {costEstimate.totalCost > 0 && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground cursor-default">
+                    <DollarSign className="w-3.5 h-3.5" />
+                    <span className="tabular-nums font-medium">
+                      ~{formatCost(costEstimate.totalCost)}
+                    </span>
+                    <span className="text-xs">est.</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs space-y-1.5 max-w-64">
+                  <p className="font-semibold">Estimated cost breakdown</p>
+                  <p className="text-muted-foreground">
+                    {panel.length} panelists × {surveyModels.length} model{surveyModels.length !== 1 ? "s" : ""} × {subQuestions.length} question{subQuestions.length !== 1 ? "s" : ""}
+                  </p>
+                  {providerEntries.map(([provider, data]) => (
+                    <div key={provider} className="flex justify-between gap-4">
+                      <span>{provider}</span>
+                      <span className="tabular-nums">
+                        {formatCost(data.totalCost)}
+                        <span className="text-muted-foreground ml-1">({data.calls} calls)</span>
+                      </span>
+                    </div>
+                  ))}
+                  <p className="text-muted-foreground border-t pt-1">
+                    Input: ~{formatCost(providerEntries.reduce((s, [, d]) => s + d.inputCost, 0))}
+                    {" · "}
+                    Output: ~{formatCost(providerEntries.reduce((s, [, d]) => s + d.outputCost, 0))}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          <Button onClick={handleRunSurvey} disabled={!isValid} className="gap-2">
+            <Play className="w-4 h-4" />
+            Run Survey
+          </Button>
+        </div>
       </div>
 
       {subQuestions.map((sq, sqIndex) => (
