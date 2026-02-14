@@ -3,8 +3,9 @@ import logging
 
 from langchain_core.messages import SystemMessage, HumanMessage
 from backend.graph.state import SurveyAgentState
-from backend.graph.prompts import PERSONA_SYSTEM, SURVEY_USER
+from backend.graph.prompts import PERSONA_SYSTEM, PERSONA_MEMORY_BLOCK, SURVEY_USER
 from backend.services.llm import get_llm
+from backend.services.history import get_respondent_history
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,32 @@ def _format_sub_questions(sub_questions: list[dict]) -> str:
         options_str = ", ".join(f'"{opt}"' for opt in sq["answer_options"])
         lines.append(f'- {sq["id"]}: {sq["text"]}\n  Options: [{options_str}]')
     return "\n".join(lines)
+
+
+def _format_history(history: list[dict]) -> str:
+    """Format past survey answers into a readable memory block."""
+    if not history:
+        return ""
+
+    sections = []
+    for i, entry in enumerate(history, 1):
+        question = entry["question"]
+        answers = entry["answers"]
+        sub_questions = entry.get("sub_questions", [])
+
+        sq_lookup = {sq["id"]: sq["text"] for sq in sub_questions}
+
+        answer_lines = []
+        for sq_id, answer in answers.items():
+            sq_text = sq_lookup.get(sq_id, sq_id)
+            answer_lines.append(f"  - {sq_text}: **{answer}**")
+
+        section = f"**Survey {i}**: \"{question}\"\n" + "\n".join(answer_lines)
+        sections.append(section)
+
+    history_text = "\n\n".join(sections)
+
+    return PERSONA_MEMORY_BLOCK.format(history_text=history_text)
 
 
 def _parse_answers(content: str, sub_questions: list[dict]) -> dict[str, str]:
@@ -38,7 +65,6 @@ def _parse_answers(content: str, sub_questions: list[dict]) -> dict[str, str]:
                 answers = json.loads(text[start:end + 1])
             except json.JSONDecodeError:
                 logger.warning("Failed to parse LLM response as JSON: %s", text[:200])
-                # Fallback: return first option for each sub-question
                 answers = {sq["id"]: sq["answer_options"][0] for sq in sub_questions}
         else:
             logger.warning("No JSON found in LLM response: %s", text[:200])
@@ -66,6 +92,18 @@ def survey_respond(state: SurveyAgentState) -> dict:
     model = state["model"]
     api_key = state["api_key"]
     temperature = state.get("temperature")
+    survey_id = state["survey_id"]
+
+    # Fetch this persona's past answers for memory
+    respondent_id = respondent["id"]
+    history = get_respondent_history(respondent_id, exclude_survey_id=survey_id)
+    memory_block = _format_history(history)
+
+    if history:
+        logger.info(
+            "Persona %d has %d past surveys in memory",
+            respondent_id, len(history),
+        )
 
     system_prompt = PERSONA_SYSTEM.format(
         role=respondent.get("role", "Unknown"),
@@ -85,6 +123,7 @@ def survey_respond(state: SurveyAgentState) -> dict:
         education_topic=respondent.get("education_topic", "Unknown"),
         industry_wish=respondent.get("industry_wish", "Unknown"),
         region=respondent.get("region", "Unknown"),
+        memory_block=memory_block,
     )
 
     user_prompt = SURVEY_USER.format(
@@ -121,7 +160,7 @@ def survey_respond(state: SurveyAgentState) -> dict:
 
     return {
         "responses": [{
-            "respondent_id": respondent["id"],
+            "respondent_id": respondent_id,
             "agent_name": agent_name,
             "model": model,
             "answers": answers,

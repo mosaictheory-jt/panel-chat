@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { PersonaRadar } from "./PersonaRadar"
 import { getAvatar } from "@/lib/avatar"
 import {
   User,
@@ -136,6 +137,11 @@ export function PersonaDetail({
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {/* Technical Persona Radar */}
+          <PersonaRadar respondent={respondent} />
+
+          <Separator />
+
           {/* Survey Responses — grouped by survey */}
           {answerGroups.length > 0 && (
             <div>

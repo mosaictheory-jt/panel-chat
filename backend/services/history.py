@@ -60,6 +60,47 @@ def save_response(
     )
 
 
+def get_respondent_history(respondent_id: int, exclude_survey_id: str | None = None) -> list[dict]:
+    """Retrieve a respondent's past survey answers for persona memory.
+
+    Returns a list of dicts: [{ question, answers: {sq_id: answer}, sub_questions: [...] }]
+    """
+    query = """
+        SELECT s.question, s.breakdown, sr.answers
+        FROM survey_responses sr
+        JOIN surveys s ON sr.survey_id = s.id
+        WHERE sr.respondent_id = ?
+    """
+    params: list = [respondent_id]
+
+    if exclude_survey_id:
+        query += " AND sr.survey_id != ?"
+        params.append(exclude_survey_id)
+
+    query += " ORDER BY sr.created_at ASC"
+
+    rows = execute_query(query, params).fetchall()
+    history = []
+    for row in rows:
+        question = row[0]
+        breakdown_raw = row[1]
+        answers_raw = row[2]
+
+        answers = json.loads(answers_raw) if isinstance(answers_raw, str) else (answers_raw or {})
+        breakdown = json.loads(breakdown_raw) if isinstance(breakdown_raw, str) else breakdown_raw
+
+        sub_questions = []
+        if breakdown and "sub_questions" in breakdown:
+            sub_questions = breakdown["sub_questions"]
+
+        history.append({
+            "question": question,
+            "answers": answers,
+            "sub_questions": sub_questions,
+        })
+    return history
+
+
 def list_surveys() -> list[SurveySummary]:
     rows = execute_query(
         "SELECT id, question, panel_size, created_at FROM surveys ORDER BY created_at DESC"
