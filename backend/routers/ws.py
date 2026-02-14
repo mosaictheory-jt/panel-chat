@@ -6,7 +6,14 @@ import threading
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from backend.services.history import get_survey, save_response
+from backend.services.history import (
+    get_survey,
+    save_response,
+    save_debate_message,
+    save_round_summary,
+    save_debate_analysis,
+    save_chat_mode,
+)
 from backend.graph.builder import build_survey_graph, build_debate_graph
 
 logger = logging.getLogger(__name__)
@@ -45,6 +52,9 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
             await websocket.send_json({"type": "error", "data": {"message": "No panel selected"}})
             await websocket.close()
             return
+
+        # Persist chat mode so historical loads know whether this is a survey or debate
+        save_chat_mode(survey_id, chat_mode)
 
         if chat_mode == "debate":
             graph = build_debate_graph()
@@ -135,33 +145,38 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
                 elif node_name == "debate_respond":
                     debate_messages = node_output.get("debate_messages", [])
                     for msg in debate_messages:
+                        msg_data = {
+                            "respondent_id": msg["respondent_id"],
+                            "agent_name": msg["agent_name"],
+                            "model": msg["model"],
+                            "round": msg["round"],
+                            "text": msg["text"],
+                            "token_usage": msg.get("token_usage"),
+                        }
+                        save_debate_message(survey_id, msg_data)
                         await websocket.send_json({
                             "type": "debate_message",
-                            "data": {
-                                "respondent_id": msg["respondent_id"],
-                                "agent_name": msg["agent_name"],
-                                "model": msg["model"],
-                                "round": msg["round"],
-                                "text": msg["text"],
-                                "token_usage": msg.get("token_usage"),
-                            },
+                            "data": msg_data,
                         })
 
                 elif node_name == "summarize_round":
                     current_round = node_output.get("current_round", 1)
                     summary = node_output.get("prior_round_summary", "")
+                    summary_data = {
+                        "round": current_round - 1,
+                        "total_rounds": num_rounds,
+                        "summary": summary,
+                    }
+                    save_round_summary(survey_id, summary_data)
                     await websocket.send_json({
                         "type": "round_complete",
-                        "data": {
-                            "round": current_round - 1,
-                            "total_rounds": num_rounds,
-                            "summary": summary,
-                        },
+                        "data": summary_data,
                     })
 
                 elif node_name == "analyze_debate":
                     analysis = node_output.get("analysis")
                     if analysis:
+                        save_debate_analysis(survey_id, analysis)
                         await websocket.send_json({
                             "type": "debate_analysis",
                             "data": analysis,

@@ -67,25 +67,6 @@ export interface SurveyResponse {
   token_usage?: TokenUsage | null
 }
 
-export interface SurveySession {
-  id: string
-  question: string
-  breakdown: QuestionBreakdown | null
-  panel_size: number
-  filters: Filters | null
-  models: string[]
-  panel: Respondent[]
-  responses: SurveyResponse[]
-  created_at: string | null
-}
-
-export interface SurveySummary {
-  id: string
-  question: string
-  panel_size: number
-  created_at: string | null
-}
-
 export interface DebateTheme {
   label: string
   description: string
@@ -102,17 +83,6 @@ export interface DebateAnalysis {
   token_usage?: TokenUsage | null
 }
 
-export interface CompletedSurvey {
-  id: string
-  question: string
-  breakdown: QuestionBreakdown | null
-  responses: SurveyResponse[]
-  panel: Respondent[]
-  debateMessages?: DebateMessage[]
-  roundSummaries?: RoundSummary[]
-  debateAnalysis?: DebateAnalysis | null
-}
-
 export interface DebateMessage {
   respondent_id: number
   agent_name: string
@@ -126,6 +96,40 @@ export interface RoundSummary {
   round: number
   totalRounds: number
   summary: string
+}
+
+export interface SurveySession {
+  id: string
+  question: string
+  breakdown: QuestionBreakdown | null
+  panel_size: number
+  filters: Filters | null
+  models: string[]
+  panel: Respondent[]
+  responses: SurveyResponse[]
+  chat_mode: string | null
+  debate_messages: DebateMessage[]
+  round_summaries: RoundSummary[]
+  debate_analysis: DebateAnalysis | null
+  created_at: string | null
+}
+
+export interface SurveySummary {
+  id: string
+  question: string
+  panel_size: number
+  created_at: string | null
+}
+
+export interface CompletedSurvey {
+  id: string
+  question: string
+  breakdown: QuestionBreakdown | null
+  responses: SurveyResponse[]
+  panel: Respondent[]
+  debateMessages?: DebateMessage[]
+  roundSummaries?: RoundSummary[]
+  debateAnalysis?: DebateAnalysis | null
 }
 
 export interface WSMessage {

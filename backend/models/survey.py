@@ -63,6 +63,10 @@ class SurveySession(BaseModel):
     models: list[str]
     panel: list[dict] = []
     responses: list[SurveyResponse] = []
+    chat_mode: str | None = None
+    debate_messages: list[dict] = []
+    round_summaries: list[dict] = []
+    debate_analysis: dict | None = None
     created_at: str | None = None
 
 

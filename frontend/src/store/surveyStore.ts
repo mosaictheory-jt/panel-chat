@@ -130,6 +130,9 @@ interface SurveyState {
     breakdown: QuestionBreakdown | null,
     responses: SurveyResponse[],
     models: string[],
+    debateMessages?: DebateMessage[],
+    roundSummaries?: RoundSummary[],
+    debateAnalysis?: DebateAnalysis | null,
   ) => void
 }
 
@@ -353,27 +356,35 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
       visibleSurveyIds: state.visibleSurveyIds.filter((v) => v !== id),
     })),
 
-  loadSurvey: (id, question, panel, breakdown, responses, models) => {
+  loadSurvey: (id, question, panel, breakdown, responses, models, debateMessages, roundSummaries, debateAnalysis) => {
     const state = get()
+    const hasDebateData = (debateMessages && debateMessages.length > 0) || debateAnalysis
+    const hasResults = responses.length > 0 || hasDebateData
     const updates: Partial<SurveyState> = {
-      phase: responses.length > 0 ? "complete" : breakdown ? "reviewing" : "idle",
+      phase: hasResults ? "complete" : breakdown ? "reviewing" : "idle",
       surveyId: id,
       question,
       panel,
       surveyModels: models,
       breakdown,
       responses,
+      debateMessages: debateMessages ?? [],
+      roundSummaries: roundSummaries ?? [],
+      debateAnalysis: debateAnalysis ?? null,
       error: null,
     }
 
-    // Auto-add loaded surveys with results to the accumulated view
-    if (breakdown && responses.length > 0) {
+    // Auto-add loaded surveys/debates with results to the accumulated view
+    if ((breakdown && responses.length > 0) || hasDebateData) {
       const completed: CompletedSurvey = {
         id,
         question,
         breakdown,
         responses,
         panel,
+        debateMessages: debateMessages && debateMessages.length > 0 ? debateMessages : undefined,
+        roundSummaries: roundSummaries && roundSummaries.length > 0 ? roundSummaries : undefined,
+        debateAnalysis: debateAnalysis ?? undefined,
       }
       updates.completedSurveys = {
         ...state.completedSurveys,

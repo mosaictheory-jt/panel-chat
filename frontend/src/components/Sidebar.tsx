@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { FilterPanel } from "./FilterPanel"
 import { Settings, Eye, EyeOff, Sun, Moon, Monitor, Loader2 } from "lucide-react"
-import type { CompletedSurvey, Respondent, SurveyResponse } from "@/types"
+import type { CompletedSurvey, Respondent, SurveyResponse, DebateMessage, RoundSummary, DebateAnalysis } from "@/types"
 
 export function Sidebar() {
   const {
@@ -28,10 +28,18 @@ export function Sidebar() {
     listSurveys().then(setHistory).catch(console.error)
   }, [setHistory])
 
+  const mapRoundSummaries = (raw: Record<string, unknown>[]): RoundSummary[] =>
+    raw.map((rs) => ({
+      round: rs.round as number,
+      totalRounds: (rs.totalRounds ?? rs.total_rounds) as number,
+      summary: rs.summary as string,
+    }))
+
   const handleSelectSurvey = async (id: string) => {
     if (id === surveyId) return
     try {
       const survey = await getSurvey(id)
+      const roundSummaries = mapRoundSummaries((survey.round_summaries ?? []) as Record<string, unknown>[])
       loadSurvey(
         survey.id,
         survey.question,
@@ -39,6 +47,9 @@ export function Sidebar() {
         survey.breakdown,
         survey.responses as SurveyResponse[],
         survey.models,
+        (survey.debate_messages ?? []) as DebateMessage[],
+        roundSummaries,
+        (survey.debate_analysis ?? null) as DebateAnalysis | null,
       )
     } catch (err) {
       console.error("Failed to load survey:", err)
@@ -70,6 +81,9 @@ export function Sidebar() {
           completed.breakdown,
           completed.responses,
           [],
+          completed.debateMessages,
+          completed.roundSummaries,
+          completed.debateAnalysis,
         )
       }
       return
@@ -81,6 +95,9 @@ export function Sidebar() {
       const survey = await getSurvey(id)
       const panel = survey.panel as unknown as Respondent[]
       const responses = survey.responses as SurveyResponse[]
+      const debateMessages = (survey.debate_messages ?? []) as DebateMessage[]
+      const roundSummaries = mapRoundSummaries((survey.round_summaries ?? []) as Record<string, unknown>[])
+      const debateAnalysis = (survey.debate_analysis ?? null) as DebateAnalysis | null
 
       const completed: CompletedSurvey = {
         id: survey.id,
@@ -88,6 +105,9 @@ export function Sidebar() {
         breakdown: survey.breakdown,
         responses,
         panel,
+        debateMessages: debateMessages.length > 0 ? debateMessages : undefined,
+        roundSummaries: roundSummaries.length > 0 ? roundSummaries : undefined,
+        debateAnalysis: debateAnalysis ?? undefined,
       }
       addCompletedSurvey(completed)
 
@@ -100,6 +120,9 @@ export function Sidebar() {
           survey.breakdown,
           responses,
           survey.models,
+          debateMessages,
+          roundSummaries,
+          debateAnalysis,
         )
       }
     } catch (err) {

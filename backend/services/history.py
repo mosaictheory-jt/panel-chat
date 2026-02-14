@@ -60,6 +60,54 @@ def save_response(
     )
 
 
+def save_debate_message(survey_id: str, message: dict) -> None:
+    """Append a debate message to the survey's debate_messages JSON array."""
+    existing = execute_query(
+        "SELECT debate_messages FROM surveys WHERE id = ?", [survey_id]
+    ).fetchone()
+    messages = []
+    if existing and existing[0]:
+        raw = existing[0]
+        messages = json.loads(raw) if isinstance(raw, str) else (raw or [])
+    messages.append(message)
+    execute_query(
+        "UPDATE surveys SET debate_messages = ? WHERE id = ?",
+        [json.dumps(messages), survey_id],
+    )
+
+
+def save_round_summary(survey_id: str, summary: dict) -> None:
+    """Append a round summary to the survey's round_summaries JSON array."""
+    existing = execute_query(
+        "SELECT round_summaries FROM surveys WHERE id = ?", [survey_id]
+    ).fetchone()
+    summaries = []
+    if existing and existing[0]:
+        raw = existing[0]
+        summaries = json.loads(raw) if isinstance(raw, str) else (raw or [])
+    summaries.append(summary)
+    execute_query(
+        "UPDATE surveys SET round_summaries = ? WHERE id = ?",
+        [json.dumps(summaries), survey_id],
+    )
+
+
+def save_debate_analysis(survey_id: str, analysis: dict) -> None:
+    """Save the final debate analysis to the survey."""
+    execute_query(
+        "UPDATE surveys SET debate_analysis = ? WHERE id = ?",
+        [json.dumps(analysis), survey_id],
+    )
+
+
+def save_chat_mode(survey_id: str, chat_mode: str) -> None:
+    """Save the chat mode (survey or debate) to the survey."""
+    execute_query(
+        "UPDATE surveys SET chat_mode = ? WHERE id = ?",
+        [json.dumps(chat_mode), survey_id],
+    )
+
+
 def get_respondent_history(respondent_id: int, exclude_survey_id: str | None = None) -> list[dict]:
     """Retrieve a respondent's past survey answers for persona memory.
 
@@ -114,9 +162,20 @@ def list_surveys() -> list[SurveySummary]:
     ]
 
 
+def _parse_json_field(raw) -> object:
+    """Parse a JSON field that may be a string, dict/list, or None."""
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        return json.loads(raw)
+    return raw
+
+
 def get_survey(survey_id: str) -> SurveySession | None:
     row = execute_query(
-        "SELECT id, question, breakdown, panel_size, filters, models, panel, created_at FROM surveys WHERE id = ?",
+        """SELECT id, question, breakdown, panel_size, filters, models, panel,
+                  created_at, chat_mode, debate_messages, round_summaries, debate_analysis
+           FROM surveys WHERE id = ?""",
         [survey_id],
     ).fetchone()
     if not row:
@@ -139,17 +198,16 @@ def get_survey(survey_id: str) -> SurveySession | None:
     breakdown_raw = row[2]
     breakdown = None
     if breakdown_raw:
-        breakdown_data = json.loads(breakdown_raw) if isinstance(breakdown_raw, str) else breakdown_raw
+        breakdown_data = _parse_json_field(breakdown_raw)
         breakdown = QuestionBreakdown(**breakdown_data)
 
-    filters_raw = row[4]
-    filters = json.loads(filters_raw) if isinstance(filters_raw, str) else filters_raw
-
-    models_raw = row[5]
-    models = json.loads(models_raw) if isinstance(models_raw, str) else models_raw
-
-    panel_raw = row[6]
-    panel = json.loads(panel_raw) if isinstance(panel_raw, str) else (panel_raw or [])
+    filters = _parse_json_field(row[4])
+    models = _parse_json_field(row[5]) or []
+    panel = _parse_json_field(row[6]) or []
+    chat_mode = _parse_json_field(row[8])
+    debate_messages = _parse_json_field(row[9]) or []
+    round_summaries = _parse_json_field(row[10]) or []
+    debate_analysis = _parse_json_field(row[11])
 
     return SurveySession(
         id=row[0],
@@ -160,5 +218,9 @@ def get_survey(survey_id: str) -> SurveySession | None:
         models=models,
         panel=panel,
         responses=responses,
+        chat_mode=chat_mode,
+        debate_messages=debate_messages,
+        round_summaries=round_summaries,
+        debate_analysis=debate_analysis,
         created_at=str(row[7]) if row[7] else None,
     )

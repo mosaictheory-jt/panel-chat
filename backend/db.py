@@ -67,6 +67,13 @@ def init_db() -> None:
             )
         """)
 
+        # Add debate columns to existing surveys table (safe to re-run)
+        for col_name in ("chat_mode", "debate_messages", "round_summaries", "debate_analysis"):
+            try:
+                conn.execute(f"ALTER TABLE surveys ADD COLUMN {col_name} JSON")
+            except duckdb.CatalogException:
+                pass  # column already exists
+
     count = execute_query("SELECT COUNT(*) FROM respondents").fetchone()
     logger.info("Database initialized with %d respondents", count[0] if count else 0)
 
