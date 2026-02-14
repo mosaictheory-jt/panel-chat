@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge"
 import { getAvatar } from "@/lib/avatar"
 import { ChevronRight } from "lucide-react"
 import type { Respondent, SurveyResponse, QuestionBreakdown } from "@/types"

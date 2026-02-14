@@ -1,6 +1,14 @@
 import type { ApiKeys, WSMessage } from "@/types"
 
-const WS_BASE = "ws://localhost:8000"
+function getWsBase(): string {
+  const envUrl = import.meta.env.VITE_WS_URL
+  if (envUrl) return envUrl
+  // Derive from current page location (works in Docker with nginx proxy)
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:"
+  return `${proto}//${window.location.host}`
+}
+
+const WS_BASE = getWsBase()
 
 export function connectSurveyWS(
   surveyId: string,

@@ -1,6 +1,6 @@
 import type { QuestionBreakdown, SurveySession, SurveySummary } from "@/types"
 
-const BASE_URL = "http://localhost:8000"
+const BASE_URL = import.meta.env.VITE_API_URL ?? ""
 
 async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {

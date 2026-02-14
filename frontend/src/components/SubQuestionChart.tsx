@@ -167,14 +167,17 @@ export function SubQuestionChart({
               </Pie>
               <Tooltip
                 {...tooltipStyles}
-                formatter={(value: number, name: string) => [
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                formatter={((value: number, name: string) => [
                   `${value} (${totalResponses > 0 ? Math.round((value / totalResponses) * 100) : 0}%)`,
                   name,
-                ]}
+                ]) as any}
               />
             </PieChart>
           ) : useGroupedBar ? (
-            <BarChart data={modelChartData} onClick={(e) => e?.activePayload?.[0] && handleBarClick(e.activePayload[0])}>
+            <BarChart data={modelChartData} onClick={(e: any) => {
+              if (e?.activePayload?.[0]) handleBarClick(e.activePayload[0])
+            }}>
               <XAxis dataKey="name" tick={false} height={8} />
               <YAxis allowDecimals={false} tick={{ fontSize: 10 }} width={30} />
               <Tooltip {...tooltipStyles} />
@@ -189,15 +192,18 @@ export function SubQuestionChart({
               ))}
             </BarChart>
           ) : (
-            <BarChart data={chartData} onClick={(e) => e?.activePayload?.[0] && handleBarClick(e.activePayload[0].payload)}>
+            <BarChart data={chartData} onClick={(e: any) => {
+              if (e?.activePayload?.[0]) handleBarClick(e.activePayload[0].payload)
+            }}>
               <XAxis dataKey="name" tick={false} height={8} />
               <YAxis allowDecimals={false} tick={{ fontSize: 10 }} width={30} />
               <Tooltip
                 {...tooltipStyles}
-                formatter={(value: number) => [
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                formatter={((value: number) => [
                   `${value} (${totalResponses > 0 ? Math.round((value / totalResponses) * 100) : 0}%)`,
                   "Responses",
-                ]}
+                ]) as any}
               />
               <Bar dataKey="count" radius={[4, 4, 0, 0]} cursor="pointer">
                 {chartData.map((entry, index) => (
