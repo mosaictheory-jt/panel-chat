@@ -307,7 +307,7 @@ export function SurveyView() {
                 {debateMessages.length} messages · {roundSummaries.length} rounds
               </Badge>
             )}
-            {phase === "complete" && isDebate && debateAnalysis && (
+            {phase === "complete" && isDebate && debateAnalysis && (debateAnalysis.themes?.length ?? 0) > 0 && (
               <Badge className="text-xs bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30">
                 {debateAnalysis.themes.length} theme{debateAnalysis.themes.length !== 1 ? "s" : ""} identified
               </Badge>

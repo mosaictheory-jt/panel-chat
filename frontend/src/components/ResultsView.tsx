@@ -224,7 +224,7 @@ function DebateResultGroup({
               {survey.debateMessages && survey.debateMessages.length > 0 && (
                 <> · {survey.debateMessages.length} messages</>
               )}
-              {survey.debateAnalysis && (
+              {survey.debateAnalysis && (survey.debateAnalysis.themes?.length ?? 0) > 0 && (
                 <> · {survey.debateAnalysis.themes.length} theme{survey.debateAnalysis.themes.length !== 1 ? "s" : ""}</>
               )}
             </p>

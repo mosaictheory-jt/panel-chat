@@ -154,7 +154,7 @@ export function DebateAnalysisView({
           <Lightbulb className="w-4 h-4 text-primary" />
           <h3 className="font-semibold text-sm">Debate Analysis</h3>
           <Badge variant="secondary" className="text-[10px]">
-            {analysis.themes.length} theme{analysis.themes.length !== 1 ? "s" : ""}
+            {analysis.themes?.length ?? 0} theme{(analysis.themes?.length ?? 0) !== 1 ? "s" : ""}
           </Badge>
         </div>
         {onViewTranscript && (
@@ -179,7 +179,7 @@ export function DebateAnalysisView({
 
       {/* Theme clusters */}
       <div className="space-y-2">
-        {analysis.themes.map((theme, idx) => (
+        {(analysis.themes ?? []).map((theme, idx) => (
           <ThemeCard
             key={idx}
             theme={theme}
@@ -191,19 +191,19 @@ export function DebateAnalysisView({
       </div>
 
       {/* Consensus & Tensions */}
-      {(analysis.consensus_points.length > 0 || analysis.key_tensions.length > 0) && (
+      {((analysis.consensus_points?.length ?? 0) > 0 || (analysis.key_tensions?.length ?? 0) > 0) && (
         <>
           <Separator />
           <div className="grid gap-4 sm:grid-cols-2">
             {/* Consensus */}
-            {analysis.consensus_points.length > 0 && (
+            {(analysis.consensus_points?.length ?? 0) > 0 && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
                   <Users className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                   <p className="text-xs font-semibold">Consensus</p>
                 </div>
                 <ul className="space-y-1">
-                  {analysis.consensus_points.map((point, idx) => (
+                  {(analysis.consensus_points ?? []).map((point, idx) => (
                     <li key={idx} className="text-xs text-foreground/90 flex gap-2">
                       <span className="text-emerald-500 shrink-0 mt-0.5">✓</span>
                       <span className="leading-relaxed">{point}</span>
@@ -214,14 +214,14 @@ export function DebateAnalysisView({
             )}
 
             {/* Tensions */}
-            {analysis.key_tensions.length > 0 && (
+            {(analysis.key_tensions?.length ?? 0) > 0 && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
                   <Zap className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                   <p className="text-xs font-semibold">Key Tensions</p>
                 </div>
                 <ul className="space-y-1">
-                  {analysis.key_tensions.map((tension, idx) => (
+                  {(analysis.key_tensions ?? []).map((tension, idx) => (
                     <li key={idx} className="text-xs text-foreground/90 flex gap-2">
                       <span className="text-amber-500 shrink-0 mt-0.5">⚡</span>
                       <span className="leading-relaxed">{tension}</span>
