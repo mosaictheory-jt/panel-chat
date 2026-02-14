@@ -11,16 +11,18 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getAvatar } from "@/lib/avatar"
 import { ClipboardList, Loader2, Users, BarChart3, MessageSquareText } from "lucide-react"
-import type { CompletedSurvey, Respondent, SurveyResponse } from "@/types"
+import type { CompletedSurvey, DebateMessage, Respondent, SurveyResponse } from "@/types"
 
 interface MergedPanelist {
   respondent: Respondent
   /** In the current active survey's panel */
   isActive: boolean
-  /** Has responded in the current active survey */
-  hasActiveResponse: boolean
-  /** Their responses from the current active survey */
+  /** Has any content (vote response or debate message) */
+  hasActiveContent: boolean
+  /** Their vote responses from the current active survey */
   activeResponses: SurveyResponse[]
+  /** Their latest debate message (newest round) */
+  latestDebateMessage: DebateMessage | null
   /** Number of visible completed surveys they appeared in (excluding current if still running) */
   historicalSurveyCount: number
 }
@@ -101,6 +103,18 @@ export function SurveyView() {
     return map
   }, [responses])
 
+  // Latest debate message per respondent (highest round number)
+  const latestDebateMessageByRespondent = useMemo(() => {
+    const map = new Map<number, DebateMessage>()
+    for (const msg of debateMessages) {
+      const existing = map.get(msg.respondent_id)
+      if (!existing || msg.round > existing.round) {
+        map.set(msg.respondent_id, msg)
+      }
+    }
+    return map
+  }, [debateMessages])
+
   // Build merged panelist list: current panel + historical panelists from visible surveys
   const mergedPanelists: MergedPanelist[] = useMemo(() => {
     const respondentById = new Map<number, Respondent>()
@@ -126,11 +140,13 @@ export function SurveyView() {
     // Active panelists first
     for (const r of panel) {
       const activeResps = activeResponsesByRespondent.get(r.id) ?? []
+      const latestMsg = latestDebateMessageByRespondent.get(r.id) ?? null
       result.push({
         respondent: r,
         isActive: true,
-        hasActiveResponse: activeResps.length > 0,
+        hasActiveContent: activeResps.length > 0 || latestMsg !== null,
         activeResponses: activeResps,
+        latestDebateMessage: latestMsg,
         historicalSurveyCount: historicalCounts.get(r.id) ?? 0,
       })
     }
@@ -141,14 +157,15 @@ export function SurveyView() {
       result.push({
         respondent,
         isActive: false,
-        hasActiveResponse: false,
+        hasActiveContent: false,
         activeResponses: [],
+        latestDebateMessage: null,
         historicalSurveyCount: historicalCounts.get(id) ?? 0,
       })
     }
 
     return result
-  }, [panel, completedSurveys, visibleSurveyIds, surveyId, activeRespondentIds, activeResponsesByRespondent])
+  }, [panel, completedSurveys, visibleSurveyIds, surveyId, activeRespondentIds, activeResponsesByRespondent, latestDebateMessageByRespondent])
 
   const openPersonaDetail = (respondent: Respondent) => {
     setSelectedRespondent(respondent)
@@ -357,14 +374,15 @@ export function SurveyView() {
             {/* Unified panelist grid — one card per panelist */}
             <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
               {mergedPanelists.map((mp) => {
-                const { respondent, isActive, hasActiveResponse, activeResponses, historicalSurveyCount } = mp
+                const { respondent, isActive, hasActiveContent, activeResponses, latestDebateMessage, historicalSurveyCount } = mp
 
-                // Active panelist who has responded → response card
-                if (isActive && hasActiveResponse && activeResponses.length > 0) {
+                // Active panelist with content (vote or debate message) → response card
+                if (isActive && hasActiveContent) {
                   return (
                     <ResponseCard
                       key={respondent.id}
-                      response={activeResponses[0]}
+                      response={activeResponses.length > 0 ? activeResponses[0] : undefined}
+                      debateMessage={latestDebateMessage ?? undefined}
                       respondent={respondent}
                       breakdown={breakdown}
                       historicalCount={historicalSurveyCount}
@@ -374,7 +392,7 @@ export function SurveyView() {
                 }
 
                 // Active panelist still pending
-                if (isActive && !hasActiveResponse) {
+                if (isActive && !hasActiveContent) {
                   const avatar = getAvatar(respondent.id, respondent.role)
                   return (
                     <button
