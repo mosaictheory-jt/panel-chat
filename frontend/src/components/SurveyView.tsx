@@ -5,13 +5,12 @@ import { ResultsView } from "./ResultsView"
 import { ResponseCard } from "./ResponseCard"
 import { PersonaDetail } from "./PersonaDetail"
 import { DebateTranscript } from "./DebateTranscript"
-import { DebateAnalysisView } from "./DebateAnalysisView"
 import { CostBadge } from "./CostBadge"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getAvatar } from "@/lib/avatar"
-import { ClipboardList, Loader2, Users, BarChart3, Lightbulb, MessageSquareText } from "lucide-react"
+import { ClipboardList, Loader2, Users, BarChart3, MessageSquareText } from "lucide-react"
 import type { CompletedSurvey, DebateMessage, Respondent, SurveyResponse } from "@/types"
 
 interface MergedPanelist {
@@ -73,24 +72,28 @@ export function SurveyView() {
     }
 
     // Include live running survey data if not already in completed
-    if (
-      phase === "running" &&
-      surveyId &&
-      breakdown &&
-      responses.length > 0 &&
-      !addedIds.has(surveyId)
-    ) {
-      result.push({
-        id: surveyId,
-        question: question ?? "",
-        breakdown,
-        responses,
-        panel,
-      })
+    if (phase === "running" && surveyId && !addedIds.has(surveyId)) {
+      const isLiveDebate = chatMode === "debate"
+      // Survey mode needs breakdown + responses; debate mode needs debate messages
+      const hasLiveContent = isLiveDebate
+        ? debateMessages.length > 0
+        : breakdown && responses.length > 0
+      if (hasLiveContent) {
+        result.push({
+          id: surveyId,
+          question: question ?? "",
+          breakdown,
+          responses,
+          panel,
+          debateMessages: isLiveDebate ? debateMessages : undefined,
+          roundSummaries: isLiveDebate ? roundSummaries : undefined,
+          debateAnalysis: isLiveDebate ? debateAnalysis : undefined,
+        })
+      }
     }
 
     return result
-  }, [visibleSurveyIds, completedSurveys, phase, surveyId, breakdown, responses, question, panel])
+  }, [visibleSurveyIds, completedSurveys, phase, surveyId, breakdown, responses, question, panel, chatMode, debateMessages, roundSummaries, debateAnalysis])
 
   // Active survey's respondent lookup
   const activeRespondentIds = useMemo(() => new Set(panel.map((r) => r.id)), [panel])
@@ -240,38 +243,16 @@ export function SurveyView() {
     )
   }
 
-  // If idle but we have visible past results, show only the charts/analyses
-  const surveySurveys = visibleSurveys.filter((s) => s.breakdown !== null)
-  const debateSurveys = visibleSurveys.filter((s) => s.debateAnalysis)
-
+  // If idle but we have visible past results, show only the unified results
   if ((phase === "idle" || phase === "complete") && !question && visibleSurveys.length > 0) {
     return (
       <div className="space-y-6 pb-4">
-        {surveySurveys.length > 0 && (
-          <ResultsView
-            surveys={surveySurveys}
-            onHideSurvey={removeSurveyFromResults}
-            onRespondentClick={openPersonaDetail}
-            onViewDebate={openDebateTranscript}
-          />
-        )}
-        {debateSurveys.map((survey) => (
-          <div key={survey.id} className="space-y-2">
-            <div className="flex items-start justify-between gap-3">
-              <p className="font-semibold text-sm leading-tight">{survey.question}</p>
-            </div>
-            <DebateAnalysisView
-              analysis={survey.debateAnalysis!}
-              panel={survey.panel}
-              onRespondentClick={openPersonaDetail}
-              onViewTranscript={
-                survey.debateMessages && survey.debateMessages.length > 0
-                  ? () => openDebateTranscript(survey)
-                  : undefined
-              }
-            />
-          </div>
-        ))}
+        <ResultsView
+          surveys={visibleSurveys}
+          onHideSurvey={removeSurveyFromResults}
+          onRespondentClick={openPersonaDetail}
+          onViewDebate={openDebateTranscript}
+        />
         <PersonaDetail
           respondent={selectedRespondent}
           visibleSurveys={visibleSurveys}
@@ -373,13 +354,9 @@ export function SurveyView() {
               Panelists ({uniquePanelistCount})
             </TabsTrigger>
             <TabsTrigger value="charts" className="flex-1 gap-2">
-              {isDebate ? (
-                <Lightbulb className="w-4 h-4" />
-              ) : (
-                <BarChart3 className="w-4 h-4" />
-              )}
-              {isDebate ? "Analysis" : "Results"}
-              {!isDebate && visibleSurveys.length > 1 && (
+              <BarChart3 className="w-4 h-4" />
+              Results
+              {visibleSurveys.length > 1 && (
                 <Badge variant="secondary" className="text-[10px] ml-1">
                   {visibleSurveys.length}
                 </Badge>
@@ -486,38 +463,24 @@ export function SurveyView() {
             </div>
           </TabsContent>
 
-          <TabsContent value="charts" className="mt-4">
-            {isDebate ? (
-              // Debate mode: show thematic analysis
-              debateAnalysis ? (
-                <DebateAnalysisView
-                  analysis={debateAnalysis}
-                  panel={panel}
-                  onRespondentClick={openPersonaDetail}
-                  onViewTranscript={debateMessages.length > 0 ? openLiveDebateTranscript : undefined}
-                />
-              ) : isAnalyzing ? (
-                <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground py-12">
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                  <div className="text-center">
-                    <p className="text-sm font-medium">Analyzing debate themes...</p>
-                    <p className="text-xs mt-1">Extracting position clusters from {debateMessages.length} discussion messages</p>
-                  </div>
+          <TabsContent value="charts" className="mt-4 space-y-4">
+            {/* Live debate analyzing indicator */}
+            {isDebate && isAnalyzing && !debateAnalysis && (
+              <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground py-8">
+                <Loader2 className="w-6 h-6 animate-spin" />
+                <div className="text-center">
+                  <p className="text-sm font-medium">Analyzing debate themes...</p>
+                  <p className="text-xs mt-1">Extracting position clusters from {debateMessages.length} discussion messages</p>
                 </div>
-              ) : (
-                <div className="text-center text-sm text-muted-foreground py-8">
-                  Analysis will appear here after all debate rounds complete.
-                </div>
-              )
-            ) : (
-              // Survey mode: show charts
-              <ResultsView
-                surveys={visibleSurveys}
-                onHideSurvey={removeSurveyFromResults}
-                onRespondentClick={openPersonaDetail}
-                onViewDebate={openDebateTranscript}
-              />
+              </div>
             )}
+            {/* Unified results — shows both survey charts and debate analyses */}
+            <ResultsView
+              surveys={visibleSurveys}
+              onHideSurvey={removeSurveyFromResults}
+              onRespondentClick={openPersonaDetail}
+              onViewDebate={openDebateTranscript}
+            />
           </TabsContent>
         </Tabs>
       )}

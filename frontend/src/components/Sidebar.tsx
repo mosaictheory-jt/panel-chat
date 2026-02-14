@@ -1,12 +1,12 @@
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useSurveyStore } from "@/store/surveyStore"
 import { getSurvey, listSurveys } from "@/api/client"
 import { useTheme } from "@/lib/theme"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { FilterPanel } from "./FilterPanel"
-import { Settings, Eye, EyeOff, Sun, Moon, Monitor } from "lucide-react"
-import type { Respondent, SurveyResponse } from "@/types"
+import { Settings, Eye, EyeOff, Sun, Moon, Monitor, Loader2 } from "lucide-react"
+import type { CompletedSurvey, Respondent, SurveyResponse } from "@/types"
 
 export function Sidebar() {
   const {
@@ -18,7 +18,10 @@ export function Sidebar() {
     completedSurveys,
     visibleSurveyIds,
     toggleSurveyVisibility,
+    addCompletedSurvey,
   } = useSurveyStore()
+
+  const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     listSurveys().then(setHistory).catch(console.error)
@@ -41,9 +44,40 @@ export function Sidebar() {
     }
   }
 
-  const handleToggleVisibility = (e: React.MouseEvent, id: string) => {
+  const handleToggleVisibility = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
-    toggleSurveyVisibility(id)
+    const isLoaded = id in completedSurveys
+
+    if (isLoaded) {
+      // Already loaded — just toggle visibility
+      toggleSurveyVisibility(id)
+      return
+    }
+
+    // Not loaded yet — fetch from API, add to completed, then make visible
+    setLoadingIds((prev) => new Set(prev).add(id))
+    try {
+      const survey = await getSurvey(id)
+      const hasResults = survey.responses.length > 0 || survey.breakdown
+      if (hasResults) {
+        const completed: CompletedSurvey = {
+          id: survey.id,
+          question: survey.question,
+          breakdown: survey.breakdown,
+          responses: survey.responses as SurveyResponse[],
+          panel: survey.panel as unknown as Respondent[],
+        }
+        addCompletedSurvey(completed)
+      }
+    } catch (err) {
+      console.error("Failed to load survey for visibility:", err)
+    } finally {
+      setLoadingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
   }
 
   const { theme, setTheme } = useTheme()
@@ -97,9 +131,9 @@ export function Sidebar() {
         ) : (
           <div className="space-y-1">
             {history.map((s) => {
-              const isCompleted = s.id in completedSurveys
               const isVisible = visibleSurveyIds.includes(s.id)
               const isActive = s.id === surveyId
+              const isLoading = loadingIds.has(s.id)
 
               return (
                 <div
@@ -118,23 +152,26 @@ export function Sidebar() {
                     </p>
                   </button>
 
-                  {isCompleted && (
-                    <button
-                      onClick={(e) => handleToggleVisibility(e, s.id)}
-                      className={`shrink-0 p-1 rounded transition-colors ${
-                        isVisible
+                  <button
+                    onClick={(e) => handleToggleVisibility(e, s.id)}
+                    disabled={isLoading}
+                    className={`shrink-0 p-1 rounded transition-colors ${
+                      isLoading
+                        ? "text-muted-foreground/40"
+                        : isVisible
                           ? "text-primary hover:text-primary/80"
-                          : "text-muted-foreground/40 hover:text-muted-foreground"
-                      }`}
-                      title={isVisible ? "Hide from results" : "Show in results"}
-                    >
-                      {isVisible ? (
-                        <Eye className="w-3.5 h-3.5" />
-                      ) : (
-                        <EyeOff className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  )}
+                          : "text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover:opacity-100"
+                    }`}
+                    title={isVisible ? "Hide from results" : "Show in results"}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : isVisible ? (
+                      <Eye className="w-3.5 h-3.5" />
+                    ) : (
+                      <EyeOff className="w-3.5 h-3.5" />
+                    )}
+                  </button>
                 </div>
               )
             })}

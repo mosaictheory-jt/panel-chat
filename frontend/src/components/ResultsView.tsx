@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { SubQuestionChart } from "./SubQuestionChart"
+import { DebateAnalysisView } from "./DebateAnalysisView"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,7 +17,7 @@ import {
   storeChartThemeId,
 } from "@/lib/chartThemes"
 import { computeActualCost, formatCost } from "@/lib/pricing"
-import { X, EyeOff, Palette, DollarSign, MessageSquareText } from "lucide-react"
+import { X, EyeOff, Palette, DollarSign, MessageSquareText, Swords } from "lucide-react"
 import type { CompletedSurvey, Respondent } from "@/types"
 
 interface ResultsViewProps {
@@ -56,6 +57,9 @@ export function ResultsView({
     }
   }
 
+  // Check if any surveys have charts (need theme picker)
+  const hasChartSurveys = surveys.some((s) => s.breakdown && s.breakdown.sub_questions.length > 0)
+
   if (surveys.length === 0) {
     return (
       <div className="text-center text-muted-foreground text-sm py-8">
@@ -66,62 +70,155 @@ export function ResultsView({
 
   return (
     <div className="space-y-6">
-      {/* Theme picker */}
-      <div className="flex items-center justify-end gap-2">
+      {/* Theme picker — only when we have chart-based surveys */}
+      {hasChartSurveys && (
+        <>
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => setThemePanelOpen(!themePanelOpen)}
+            >
+              <Palette className="w-3.5 h-3.5" />
+              {chartTheme.name}
+            </Button>
+          </div>
+
+          {themePanelOpen && (
+            <div className="rounded-lg border bg-card p-3 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Chart Color Theme</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                {CHART_THEMES.map((theme) => (
+                  <button
+                    key={theme.id}
+                    onClick={() => handleThemeChange(theme.id)}
+                    className={`rounded-lg border p-2 text-left transition-all hover:shadow-sm ${
+                      theme.id === themeId
+                        ? "ring-2 ring-primary border-primary"
+                        : "border-border hover:border-foreground/20"
+                    }`}
+                  >
+                    <div className="flex gap-0.5 mb-1.5">
+                      {theme.colors.slice(0, 6).map((color, i) => (
+                        <span
+                          key={i}
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-[10px] font-medium">{theme.name}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Result groups — each survey renders as charts or debate analysis */}
+      {surveys.map((survey) => {
+        const isDebateSurvey = !!survey.debateAnalysis
+        const isSurveySurvey = survey.breakdown && survey.breakdown.sub_questions.length > 0
+
+        if (isDebateSurvey) {
+          return (
+            <DebateResultGroup
+              key={survey.id}
+              survey={survey}
+              onHide={() => onHideSurvey?.(survey.id)}
+              onRespondentClick={onRespondentClick}
+              onViewTranscript={
+                survey.debateMessages && survey.debateMessages.length > 0
+                  ? () => onViewDebate?.(survey)
+                  : undefined
+              }
+            />
+          )
+        }
+
+        if (isSurveySurvey) {
+          return (
+            <SurveyResultGroup
+              key={survey.id}
+              survey={survey}
+              colors={chartTheme.colors}
+              drillDown={drillDown?.surveyId === survey.id ? drillDown : null}
+              onOptionClick={(sqId, option) => handleOptionClick(survey.id, sqId, option)}
+              onHide={() => onHideSurvey?.(survey.id)}
+              onRespondentClick={onRespondentClick}
+              onViewDebate={survey.debateMessages && survey.debateMessages.length > 0 ? () => onViewDebate?.(survey) : undefined}
+            />
+          )
+        }
+
+        // Fallback: survey with no breakdown and no analysis (shouldn't normally happen)
+        return null
+      })}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Debate result group — wraps DebateAnalysisView with a header + hide button
+// ---------------------------------------------------------------------------
+
+interface DebateResultGroupProps {
+  survey: CompletedSurvey
+  onHide: () => void
+  onRespondentClick?: (respondent: Respondent) => void
+  onViewTranscript?: () => void
+}
+
+function DebateResultGroup({
+  survey,
+  onHide,
+  onRespondentClick,
+  onViewTranscript,
+}: DebateResultGroupProps) {
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-sm leading-tight">{survey.question}</p>
+            <Badge className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 gap-0.5 shrink-0">
+              <Swords className="w-2.5 h-2.5" />
+              Debate
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {survey.panel.length} panelists
+            {survey.debateMessages && survey.debateMessages.length > 0 && (
+              <> · {survey.debateMessages.length} messages</>
+            )}
+            {survey.debateAnalysis && (
+              <> · {survey.debateAnalysis.themes.length} theme{survey.debateAnalysis.themes.length !== 1 ? "s" : ""}</>
+            )}
+          </p>
+        </div>
         <Button
-          variant="outline"
-          size="sm"
-          className="h-7 gap-1.5 text-xs"
-          onClick={() => setThemePanelOpen(!themePanelOpen)}
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
+          onClick={onHide}
+          title="Hide from results"
         >
-          <Palette className="w-3.5 h-3.5" />
-          {chartTheme.name}
+          <EyeOff className="w-3.5 h-3.5" />
         </Button>
       </div>
 
-      {themePanelOpen && (
-        <div className="rounded-lg border bg-card p-3 space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Chart Color Theme</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-            {CHART_THEMES.map((theme) => (
-              <button
-                key={theme.id}
-                onClick={() => handleThemeChange(theme.id)}
-                className={`rounded-lg border p-2 text-left transition-all hover:shadow-sm ${
-                  theme.id === themeId
-                    ? "ring-2 ring-primary border-primary"
-                    : "border-border hover:border-foreground/20"
-                }`}
-              >
-                <div className="flex gap-0.5 mb-1.5">
-                  {theme.colors.slice(0, 6).map((color, i) => (
-                    <span
-                      key={i}
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-                <p className="text-[10px] font-medium">{theme.name}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Survey result groups */}
-      {surveys.map((survey) => (
-        <SurveyResultGroup
-          key={survey.id}
-          survey={survey}
-          colors={chartTheme.colors}
-          drillDown={drillDown?.surveyId === survey.id ? drillDown : null}
-          onOptionClick={(sqId, option) => handleOptionClick(survey.id, sqId, option)}
-          onHide={() => onHideSurvey?.(survey.id)}
+      {/* Analysis content */}
+      {survey.debateAnalysis && (
+        <DebateAnalysisView
+          analysis={survey.debateAnalysis}
+          panel={survey.panel}
           onRespondentClick={onRespondentClick}
-          onViewDebate={survey.debateMessages && survey.debateMessages.length > 0 ? () => onViewDebate?.(survey) : undefined}
+          onViewTranscript={onViewTranscript}
         />
-      ))}
+      )}
     </div>
   )
 }
