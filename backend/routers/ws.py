@@ -68,6 +68,7 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
                 "current_round": 1,
                 "prior_round_summary": "",
                 "responses": [],
+                "debate_messages": [],
             }
         else:
             graph = build_survey_graph()
@@ -111,6 +112,7 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
 
             for node_name, node_output in item.items():
                 if node_name in ("survey_respond", "debate_respond"):
+                    # Structured vote responses (survey mode, or final debate round)
                     responses = node_output.get("responses", [])
                     for resp in responses:
                         saved = save_response(
@@ -131,6 +133,21 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
                                 "answers": resp["answers"],
                                 "round": resp.get("round"),
                                 "token_usage": resp.get("token_usage"),
+                            },
+                        })
+
+                    # Open-ended debate discussion messages
+                    debate_messages = node_output.get("debate_messages", [])
+                    for msg in debate_messages:
+                        await websocket.send_json({
+                            "type": "debate_message",
+                            "data": {
+                                "respondent_id": msg["respondent_id"],
+                                "agent_name": msg["agent_name"],
+                                "model": msg["model"],
+                                "round": msg["round"],
+                                "text": msg["text"],
+                                "token_usage": msg.get("token_usage"),
                             },
                         })
 

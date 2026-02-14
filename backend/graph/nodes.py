@@ -7,8 +7,9 @@ from backend.graph.prompts import (
     PERSONA_SYSTEM,
     PERSONA_MEMORY_BLOCK,
     SURVEY_USER,
-    DEBATE_USER,
-    DEBATE_FOLLOWUP_USER,
+    DEBATE_DISCUSS_USER,
+    DEBATE_DISCUSS_FOLLOWUP_USER,
+    DEBATE_VOTE_USER,
     DEBATE_SUMMARY_SYSTEM,
     DEBATE_SUMMARY_USER,
 )
@@ -110,6 +111,22 @@ def _extract_token_usage(response) -> dict | None:
     return token_usage
 
 
+def _get_summary_llm(state: DebateState):
+    """Find the first model with a valid API key for summarization."""
+    from backend.services.llm import _detect_provider
+    models = state["models"]
+    api_keys = state["api_keys"]
+    temperatures = state.get("temperatures", {})
+
+    for candidate_model in models:
+        provider = _detect_provider(candidate_model)
+        candidate_key = api_keys.get(provider, "")
+        if candidate_key:
+            temperature = temperatures.get(candidate_model)
+            return get_llm(candidate_model, candidate_key, temperature=temperature)
+    return None
+
+
 def _parse_answers(content: str, sub_questions: list[dict]) -> dict[str, str]:
     """Extract the JSON answer dict from LLM response, with fallback parsing."""
     text = content.strip()
@@ -192,11 +209,11 @@ def survey_respond(state: SurveyAgentState) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Debate mode: multi-round, same structured answers but with prior-round context
+# Debate mode: open-ended discussion rounds, then final structured vote
 # ---------------------------------------------------------------------------
 
 def debate_respond(state: DebateAgentState) -> dict:
-    """Persona answers in debate mode — aware of prior round results."""
+    """Persona participates in debate — open-ended for discussion rounds, structured for final vote."""
     respondent = state["respondent"]
     agent_name = state["agent_name"]
     sub_questions = state["sub_questions"]
@@ -207,21 +224,36 @@ def debate_respond(state: DebateAgentState) -> dict:
     survey_id = state["survey_id"]
     persona_memory = state.get("persona_memory", True)
     round_number = state["round_number"]
+    num_rounds = state["num_rounds"]
     prior_round_summary = state.get("prior_round_summary", "")
 
     system_prompt = _build_system_prompt(respondent, survey_id, persona_memory)
+    is_final_round = round_number == num_rounds
+    sq_text = _format_sub_questions(sub_questions)
 
-    if round_number == 1 or not prior_round_summary:
-        user_prompt = DEBATE_USER.format(
+    if is_final_round:
+        # Final round: structured vote
+        user_prompt = DEBATE_VOTE_USER.format(
             question=question,
-            sub_questions_text=_format_sub_questions(sub_questions),
+            prior_round_summary=prior_round_summary,
+            sub_questions_text=sq_text,
         )
-    else:
-        user_prompt = DEBATE_FOLLOWUP_USER.format(
+    elif round_number == 1 or not prior_round_summary:
+        # First discussion round
+        user_prompt = DEBATE_DISCUSS_USER.format(
             question=question,
             round_number=round_number,
+            num_rounds=num_rounds,
+            sub_questions_text=sq_text,
+        )
+    else:
+        # Follow-up discussion round
+        user_prompt = DEBATE_DISCUSS_FOLLOWUP_USER.format(
+            question=question,
+            round_number=round_number,
+            num_rounds=num_rounds,
             prior_round_summary=prior_round_summary,
-            sub_questions_text=_format_sub_questions(sub_questions),
+            sub_questions_text=sq_text,
         )
 
     llm = get_llm(model, api_key, temperature=temperature)
@@ -230,75 +262,65 @@ def debate_respond(state: DebateAgentState) -> dict:
         HumanMessage(content=user_prompt),
     ])
 
-    answers = _parse_answers(response.content, sub_questions)
     token_usage = _extract_token_usage(response)
 
-    return {
-        "responses": [{
-            "respondent_id": respondent["id"],
-            "agent_name": agent_name,
-            "model": model,
-            "answers": answers,
-            "round": round_number,
-            "token_usage": token_usage,
-        }]
-    }
+    if is_final_round:
+        # Parse structured vote
+        answers = _parse_answers(response.content, sub_questions)
+        return {
+            "responses": [{
+                "respondent_id": respondent["id"],
+                "agent_name": agent_name,
+                "model": model,
+                "answers": answers,
+                "round": round_number,
+                "token_usage": token_usage,
+            }]
+        }
+    else:
+        # Open-ended discussion message
+        return {
+            "debate_messages": [{
+                "respondent_id": respondent["id"],
+                "agent_name": agent_name,
+                "model": model,
+                "round": round_number,
+                "text": response.content.strip(),
+                "token_usage": token_usage,
+            }]
+        }
 
 
 def summarize_round(state: DebateState) -> dict:
-    """After a round completes, summarize the results for the next round's context."""
-    responses = state["responses"]
-    sub_questions = state["sub_questions"]
+    """After a discussion round, summarize the open-ended responses for the next round."""
+    debate_messages = state.get("debate_messages", [])
     question = state["question"]
     current_round = state["current_round"]
-    models = state["models"]
-    api_keys = state["api_keys"]
-    temperatures = state.get("temperatures", {})
 
-    # Filter responses for the current round
-    round_responses = [r for r in responses if r.get("round") == current_round]
+    # Filter messages for the current round
+    round_messages = [m for m in debate_messages if m.get("round") == current_round]
 
-    # Build a tally for each sub-question
-    tally_lines = []
-    sq_lookup = {sq["id"]: sq for sq in sub_questions}
-    for sq_id, sq_data in sq_lookup.items():
-        counts: dict[str, int] = {}
-        for resp in round_responses:
-            chosen = resp["answers"].get(sq_id)
-            if chosen:
-                counts[chosen] = counts.get(chosen, 0) + 1
-        counts_str = ", ".join(f'"{opt}": {counts.get(opt, 0)}' for opt in sq_data["answer_options"])
-        tally_lines.append(f'- {sq_data["text"]}: {{{counts_str}}}')
+    # Build the responses text
+    response_lines = []
+    for msg in round_messages:
+        response_lines.append(f"**{msg['agent_name']}**: {msg['text']}")
+    responses_text = "\n\n".join(response_lines) if response_lines else "No responses received."
 
-    tally_text = "\n".join(tally_lines)
-
-    # Use the first model that has an available API key for summarization
-    from backend.services.llm import _detect_provider
-    summary_model = None
-    api_key = ""
-    for candidate_model in models:
-        provider = _detect_provider(candidate_model)
-        candidate_key = api_keys.get(provider, "")
-        if candidate_key:
-            summary_model = candidate_model
-            api_key = candidate_key
-            break
-    if not summary_model or not api_key:
+    llm = _get_summary_llm(state)
+    if not llm:
         logger.error("No model with a valid API key available for summarization")
         return {
             "prior_round_summary": "Unable to generate summary — no API key available.",
             "current_round": current_round + 1,
         }
-    temperature = temperatures.get(summary_model)
 
-    llm = get_llm(summary_model, api_key, temperature=temperature)
     response = llm.invoke([
         SystemMessage(content=DEBATE_SUMMARY_SYSTEM),
         HumanMessage(content=DEBATE_SUMMARY_USER.format(
             question=question,
             round_number=current_round,
-            total_respondents=len(round_responses),
-            tally_text=tally_text,
+            total_respondents=len(round_messages),
+            responses_text=responses_text,
         )),
     ])
 

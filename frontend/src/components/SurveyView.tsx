@@ -4,12 +4,13 @@ import { BreakdownEditor } from "./BreakdownEditor"
 import { ResultsView } from "./ResultsView"
 import { ResponseCard } from "./ResponseCard"
 import { PersonaDetail } from "./PersonaDetail"
+import { DebateTranscript } from "./DebateTranscript"
 import { CostBadge } from "./CostBadge"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getAvatar } from "@/lib/avatar"
-import { ClipboardList, Loader2, Users, BarChart3 } from "lucide-react"
+import { ClipboardList, Loader2, Users, BarChart3, MessageSquareText } from "lucide-react"
 import type { CompletedSurvey, Respondent, SurveyResponse } from "@/types"
 
 interface MergedPanelist {
@@ -40,11 +41,15 @@ export function SurveyView() {
     chatMode,
     currentRound,
     totalRounds,
+    debateMessages,
+    roundSummaries,
   } = useSurveyStore()
 
   const [selectedRespondent, setSelectedRespondent] = useState<Respondent | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<string>("panelists")
+  const [debateTranscriptOpen, setDebateTranscriptOpen] = useState(false)
+  const [debateTranscriptSurvey, setDebateTranscriptSurvey] = useState<CompletedSurvey | null>(null)
   const prevPhaseRef = useRef(phase)
 
   const modelCount = surveyModels.length || 1
@@ -150,6 +155,26 @@ export function SurveyView() {
     setDetailOpen(true)
   }
 
+  const openDebateTranscript = (survey: CompletedSurvey) => {
+    setDebateTranscriptSurvey(survey)
+    setDebateTranscriptOpen(true)
+  }
+
+  // For the live/running debate — build a "live" CompletedSurvey for the transcript
+  const openLiveDebateTranscript = () => {
+    if (!surveyId || !question || !breakdown) return
+    setDebateTranscriptSurvey({
+      id: surveyId,
+      question,
+      breakdown,
+      responses,
+      panel,
+      debateMessages,
+      roundSummaries,
+    })
+    setDebateTranscriptOpen(true)
+  }
+
   // Auto-switch to charts tab when survey completes
   useEffect(() => {
     if (prevPhaseRef.current === "running" && phase === "complete") {
@@ -167,12 +192,16 @@ export function SurveyView() {
 
   const isDebate = chatMode === "debate" && totalRounds > 1
   const responsesPerRound = totalExpected
-  const currentRoundResponses = isDebate
-    ? responses.filter((r) => r.round === currentRound).length
+  // In debate mode: discussion rounds produce debateMessages, final round produces responses
+  const isFinalRound = isDebate && currentRound === totalRounds
+  const currentRoundItems = isDebate
+    ? isFinalRound
+      ? responses.filter((r) => r.round === currentRound).length
+      : debateMessages.filter((m) => m.round === currentRound).length
     : responses.length
   const currentRoundTotal = isDebate ? responsesPerRound : totalExpected
   const progressPercent = currentRoundTotal > 0
-    ? Math.round((currentRoundResponses / currentRoundTotal) * 100)
+    ? Math.round((currentRoundItems / currentRoundTotal) * 100)
     : 0
 
   // Idle — empty state
@@ -200,6 +229,7 @@ export function SurveyView() {
           surveys={visibleSurveys}
           onHideSurvey={removeSurveyFromResults}
           onRespondentClick={openPersonaDetail}
+          onViewDebate={openDebateTranscript}
         />
         <PersonaDetail
           respondent={selectedRespondent}
@@ -207,6 +237,18 @@ export function SurveyView() {
           open={detailOpen}
           onOpenChange={setDetailOpen}
         />
+        {debateTranscriptSurvey && (
+          <DebateTranscript
+            open={debateTranscriptOpen}
+            onOpenChange={setDebateTranscriptOpen}
+            question={debateTranscriptSurvey.question}
+            debateMessages={debateTranscriptSurvey.debateMessages ?? []}
+            roundSummaries={debateTranscriptSurvey.roundSummaries ?? []}
+            responses={debateTranscriptSurvey.responses}
+            breakdown={debateTranscriptSurvey.breakdown}
+            panel={debateTranscriptSurvey.panel}
+          />
+        )}
       </div>
     )
   }
@@ -243,7 +285,7 @@ export function SurveyView() {
                   Round {currentRound} / {totalRounds}
                 </Badge>
                 <Badge className="text-xs bg-blue-500/10 text-blue-700 border-blue-500/30">
-                  {currentRoundResponses} / {currentRoundTotal} this round
+                  {currentRoundItems} / {currentRoundTotal} {isFinalRound ? "votes" : "responses"}
                 </Badge>
               </>
             )}
@@ -303,7 +345,7 @@ export function SurveyView() {
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>
                     {isDebate
-                      ? `Round ${currentRound}: ${currentRoundResponses} of ${currentRoundTotal} responses`
+                      ? `Round ${currentRound}: ${currentRoundItems} of ${currentRoundTotal} ${isFinalRound ? "votes" : "responses"}`
                       : `${responses.length} of ${totalExpected} responses collected`}
                   </span>
                   <span className="font-medium tabular-nums">{progressPercent}%</span>
@@ -393,9 +435,26 @@ export function SurveyView() {
               surveys={visibleSurveys}
               onHideSurvey={removeSurveyFromResults}
               onRespondentClick={openPersonaDetail}
+              onViewDebate={openDebateTranscript}
             />
           </TabsContent>
         </Tabs>
+      )}
+
+      {/* Live debate transcript button (during running debate) */}
+      {isDebate && (phase === "running" || phase === "complete") && debateMessages.length > 0 && (
+        <button
+          onClick={openLiveDebateTranscript}
+          className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs hover:bg-primary/10 transition-colors w-full"
+        >
+          <MessageSquareText className="w-4 h-4 text-primary shrink-0" />
+          <div className="text-left flex-1">
+            <p className="font-medium">View Debate Transcript</p>
+            <p className="text-muted-foreground">
+              {debateMessages.length} discussion messages · {roundSummaries.length} round summaries
+            </p>
+          </div>
+        </button>
       )}
 
       {/* Error */}
@@ -412,6 +471,20 @@ export function SurveyView() {
         open={detailOpen}
         onOpenChange={setDetailOpen}
       />
+
+      {/* Debate Transcript Sheet */}
+      {debateTranscriptSurvey && (
+        <DebateTranscript
+          open={debateTranscriptOpen}
+          onOpenChange={setDebateTranscriptOpen}
+          question={debateTranscriptSurvey.question}
+          debateMessages={debateTranscriptSurvey.debateMessages ?? []}
+          roundSummaries={debateTranscriptSurvey.roundSummaries ?? []}
+          responses={debateTranscriptSurvey.responses}
+          breakdown={debateTranscriptSurvey.breakdown}
+          panel={debateTranscriptSurvey.panel}
+        />
+      )}
     </div>
   )
 }

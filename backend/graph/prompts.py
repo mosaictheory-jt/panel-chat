@@ -54,11 +54,43 @@ IMPORTANT:
 - You MUST pick one of the listed options for each sub-question. Do not invent new options.
 - Return ONLY the JSON object, no other text."""
 
-DEBATE_USER = """You are participating in a panel debate. For each sub-question below, you MUST choose EXACTLY ONE option from the provided list. Answer based on your profile, experience, and convictions.
+# ---------------------------------------------------------------------------
+# Debate mode prompts
+# ---------------------------------------------------------------------------
 
-This is Round 1 — give your honest initial take.
+DEBATE_DISCUSS_USER = """You're in a panel discussion about this question:
 
-Original question: {question}
+"{question}"
+
+The question will eventually be voted on with these options:
+{sub_questions_text}
+
+This is Round {round_number} of {num_rounds}. The final round will be a structured vote — right now, share your honest perspective.
+
+Write a 2-4 sentence response explaining your position. Be specific and draw on your actual experience. Where do you stand on this question and why? What would you pick and what's your reasoning?"""
+
+DEBATE_DISCUSS_FOLLOWUP_USER = """You're in Round {round_number} of {num_rounds} in a panel discussion about:
+
+"{question}"
+
+Here's what emerged from the group's discussion so far:
+
+{prior_round_summary}
+
+The final round ({num_rounds}) will be a structured vote on:
+{sub_questions_text}
+
+Now respond. You may hold your position, shift it, or refine it. In 2-4 sentences, share where you stand now and why. Reference what others said if it influenced your thinking. Be direct."""
+
+DEBATE_VOTE_USER = """This is the FINAL round of the debate. Time to cast your vote.
+
+You've been discussing: "{question}"
+
+Here's the full summary of the group discussion across all prior rounds:
+
+{prior_round_summary}
+
+Now choose your answer for each sub-question. Your vote should reflect your final position after hearing everyone's arguments.
 
 Sub-questions:
 {sub_questions_text}
@@ -70,45 +102,22 @@ IMPORTANT:
 - You MUST pick one of the listed options for each sub-question. Do not invent new options.
 - Return ONLY the JSON object, no other text."""
 
-DEBATE_FOLLOWUP_USER = """You are participating in Round {round_number} of a panel debate on this question:
-
-"{question}"
-
-Here is what the panel collectively said in the previous round:
-
-{prior_round_summary}
-
-Now it's your turn again. Consider the group's positions. You may:
-- Hold firm if you believe you're right
-- Shift your position if the arguments are compelling
-- Nuance your stance based on new perspectives
-
-For each sub-question below, choose EXACTLY ONE option:
-{sub_questions_text}
-
-Respond with a JSON object mapping each sub-question ID to your chosen option. Example:
-{{"sq_1": "Option A", "sq_2": "Option B"}}
-
-IMPORTANT:
-- You MUST pick one of the listed options. Do not invent new options.
-- Return ONLY the JSON object, no other text."""
-
-DEBATE_SUMMARY_SYSTEM = """You are a neutral moderator summarizing a panel debate round. Be concise but capture the key positions, points of agreement, and tensions."""
+DEBATE_SUMMARY_SYSTEM = """You are a neutral moderator summarizing a panel debate round. Be concise but capture the key positions, points of agreement, and tensions. Include counts where relevant."""
 
 DEBATE_SUMMARY_USER = """Summarize Round {round_number} of this debate.
 
 Question: "{question}"
 
-{total_respondents} panelists participated. Here are the vote tallies for each sub-question:
+{total_respondents} panelists shared their views. Here are their responses:
 
-{tally_text}
+{responses_text}
 
-Write a 2-4 sentence summary highlighting:
-1. Where the panel agrees
-2. Where there is disagreement or tension
-3. Any notable shifts or strong positions
+Write a 3-5 sentence summary that:
+1. Captures the main positions and how many people hold each
+2. Highlights points of agreement and tension
+3. Notes any compelling arguments or strong stances
 
-Keep it direct. This summary will be shown to the panelists before the next round."""
+This summary will be shown to panelists before the next round to inform their thinking."""
 
 ANALYZER_SYSTEM = """You are a survey design expert. Your job is to take the user's input and turn each distinct question into a structured sub-question with categorical answer options.
 

@@ -37,6 +37,7 @@ class DebateAgentState(TypedDict):
     survey_id: str
     persona_memory: bool
     round_number: int
+    num_rounds: int
     prior_round_summary: str
 
 
@@ -53,3 +54,4 @@ class DebateState(TypedDict):
     current_round: int
     prior_round_summary: str
     responses: Annotated[list[dict], operator.add]
+    debate_messages: Annotated[list[dict], operator.add]

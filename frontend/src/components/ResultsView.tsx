@@ -16,19 +16,21 @@ import {
   storeChartThemeId,
 } from "@/lib/chartThemes"
 import { computeActualCost, formatCost } from "@/lib/pricing"
-import { X, EyeOff, Palette, DollarSign } from "lucide-react"
+import { X, EyeOff, Palette, DollarSign, MessageSquareText } from "lucide-react"
 import type { CompletedSurvey, Respondent } from "@/types"
 
 interface ResultsViewProps {
   surveys: CompletedSurvey[]
   onHideSurvey?: (surveyId: string) => void
   onRespondentClick?: (respondent: Respondent) => void
+  onViewDebate?: (survey: CompletedSurvey) => void
 }
 
 export function ResultsView({
   surveys,
   onHideSurvey,
   onRespondentClick,
+  onViewDebate,
 }: ResultsViewProps) {
   const [drillDown, setDrillDown] = useState<{
     surveyId: string
@@ -117,6 +119,7 @@ export function ResultsView({
           onOptionClick={(sqId, option) => handleOptionClick(survey.id, sqId, option)}
           onHide={() => onHideSurvey?.(survey.id)}
           onRespondentClick={onRespondentClick}
+          onViewDebate={survey.debateMessages && survey.debateMessages.length > 0 ? () => onViewDebate?.(survey) : undefined}
         />
       ))}
     </div>
@@ -130,6 +133,7 @@ interface SurveyResultGroupProps {
   onOptionClick: (sqId: string, option: string | null) => void
   onHide: () => void
   onRespondentClick?: (respondent: Respondent) => void
+  onViewDebate?: () => void
 }
 
 function SurveyResultGroup({
@@ -139,6 +143,7 @@ function SurveyResultGroup({
   onOptionClick,
   onHide,
   onRespondentClick,
+  onViewDebate,
 }: SurveyResultGroupProps) {
   const respondentMap = useMemo(() => {
     const map = new Map<number, Respondent>()
@@ -204,15 +209,29 @@ function SurveyResultGroup({
             )}
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-          onClick={onHide}
-          title="Hide from results"
-        >
-          <EyeOff className="w-3.5 h-3.5" />
-        </Button>
+        <div className="flex items-center gap-1 shrink-0">
+          {onViewDebate && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground"
+              onClick={onViewDebate}
+              title="View debate transcript"
+            >
+              <MessageSquareText className="w-3.5 h-3.5" />
+              Debate
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            onClick={onHide}
+            title="Hide from results"
+          >
+            <EyeOff className="w-3.5 h-3.5" />
+          </Button>
+        </div>
       </div>
 
       {/* Charts */}

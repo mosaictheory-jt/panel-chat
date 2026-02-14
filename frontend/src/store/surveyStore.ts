@@ -3,8 +3,10 @@ import type {
   ApiKeys,
   ChatMode,
   CompletedSurvey,
+  DebateMessage,
   QuestionBreakdown,
   Respondent,
+  RoundSummary,
   SurveyResponse,
   SurveySummary,
   SurveyPhase,
@@ -88,6 +90,8 @@ interface SurveyState {
   surveyModels: string[]
   breakdown: QuestionBreakdown | null
   responses: SurveyResponse[]
+  debateMessages: DebateMessage[]
+  roundSummaries: RoundSummary[]
   currentRound: number
   totalRounds: number
   error: string | null
@@ -97,6 +101,8 @@ interface SurveyState {
   setBreakdown: (breakdown: QuestionBreakdown) => void
   startRunning: () => void
   addResponse: (response: SurveyResponse) => void
+  addDebateMessage: (message: DebateMessage) => void
+  addRoundSummary: (summary: RoundSummary) => void
   setRound: (round: number, totalRounds: number) => void
   setSurveyDone: () => void
   setError: (error: string) => void
@@ -213,6 +219,8 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
   surveyModels: [],
   breakdown: null,
   responses: [],
+  debateMessages: [],
+  roundSummaries: [],
   currentRound: 0,
   totalRounds: 1,
   error: null,
@@ -226,6 +234,8 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
       surveyModels: models,
       breakdown: null,
       responses: [],
+      debateMessages: [],
+      roundSummaries: [],
       currentRound: 0,
       totalRounds: 1,
       error: null,
@@ -240,6 +250,16 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
   addResponse: (response) =>
     set((state) => ({
       responses: [...state.responses, response],
+    })),
+
+  addDebateMessage: (message) =>
+    set((state) => ({
+      debateMessages: [...state.debateMessages, message],
+    })),
+
+  addRoundSummary: (summary) =>
+    set((state) => ({
+      roundSummaries: [...state.roundSummaries, summary],
     })),
 
   setRound: (round, totalRounds) =>
@@ -257,6 +277,8 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
         breakdown: state.breakdown,
         responses: state.responses,
         panel: state.panel,
+        debateMessages: state.debateMessages.length > 0 ? state.debateMessages : undefined,
+        roundSummaries: state.roundSummaries.length > 0 ? state.roundSummaries : undefined,
       }
       updates.completedSurveys = {
         ...state.completedSurveys,
@@ -282,6 +304,8 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
       surveyModels: [],
       breakdown: null,
       responses: [],
+      debateMessages: [],
+      roundSummaries: [],
       currentRound: 0,
       totalRounds: 1,
       error: null,

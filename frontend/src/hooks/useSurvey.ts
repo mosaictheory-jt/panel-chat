@@ -2,7 +2,7 @@ import { useCallback, useRef } from "react"
 import { createSurvey, analyzeSurvey, submitBreakdown, listSurveys } from "@/api/client"
 import { connectSurveyWS } from "@/api/ws"
 import { useSurveyStore } from "@/store/surveyStore"
-import type { QuestionBreakdown, SurveyResponse, WSMessage } from "@/types"
+import type { DebateMessage, QuestionBreakdown, SurveyResponse, WSMessage } from "@/types"
 import { getModelProvider, getProviderKey } from "@/types"
 
 export function useSurvey() {
@@ -96,9 +96,16 @@ export function useSurvey() {
               store.addResponse(data)
               break
             }
+            case "debate_message": {
+              const debateMsg = msg.data as unknown as DebateMessage
+              store.addDebateMessage(debateMsg)
+              break
+            }
             case "round_complete": {
               const round = msg.data.round as number
               const totalRounds = msg.data.total_rounds as number
+              const summary = msg.data.summary as string
+              store.addRoundSummary({ round, totalRounds, summary })
               store.setRound(round + 1, totalRounds)
               break
             }

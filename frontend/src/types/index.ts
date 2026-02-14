@@ -92,10 +92,27 @@ export interface CompletedSurvey {
   breakdown: QuestionBreakdown
   responses: SurveyResponse[]
   panel: Respondent[]
+  debateMessages?: DebateMessage[]
+  roundSummaries?: RoundSummary[]
+}
+
+export interface DebateMessage {
+  respondent_id: number
+  agent_name: string
+  model: string
+  round: number
+  text: string
+  token_usage?: TokenUsage | null
+}
+
+export interface RoundSummary {
+  round: number
+  totalRounds: number
+  summary: string
 }
 
 export interface WSMessage {
-  type: "survey_response" | "survey_done" | "round_complete" | "error"
+  type: "survey_response" | "survey_done" | "round_complete" | "debate_message" | "error"
   data: Record<string, unknown>
 }
 

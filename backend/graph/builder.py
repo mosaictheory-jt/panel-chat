@@ -56,11 +56,11 @@ def build_survey_graph() -> StateGraph:
 
 
 # ---------------------------------------------------------------------------
-# Debate graph: multiple rounds with fan-out -> collect -> summarize -> loop
+# Debate graph: discussion rounds -> summarize -> loop -> final vote -> END
 # ---------------------------------------------------------------------------
 
 def _debate_fan_out(state: DebateState) -> list[Send]:
-    """Fan out for a debate round."""
+    """Fan out for a debate round (discussion or final vote)."""
     panel = state["panel"]
     models = state["models"]
     api_keys = state["api_keys"]
@@ -70,6 +70,7 @@ def _debate_fan_out(state: DebateState) -> list[Send]:
     survey_id = state["survey_id"]
     persona_memory = state.get("persona_memory", True)
     current_round = state["current_round"]
+    num_rounds = state["num_rounds"]
     prior_round_summary = state.get("prior_round_summary", "")
 
     sends = []
@@ -92,13 +93,14 @@ def _debate_fan_out(state: DebateState) -> list[Send]:
                 "survey_id": survey_id,
                 "persona_memory": persona_memory,
                 "round_number": current_round,
+                "num_rounds": num_rounds,
                 "prior_round_summary": prior_round_summary,
             }))
     return sends
 
 
 def build_debate_graph() -> StateGraph:
-    """Multi-round debate graph: fan_out -> debate_respond -> summarize -> loop/end."""
+    """Multi-round debate: discussion rounds -> summarize -> loop -> final vote -> END."""
     graph = StateGraph(DebateState)
 
     graph.add_node("debate_respond", debate_respond)
@@ -110,7 +112,7 @@ def build_debate_graph() -> StateGraph:
     # All debate responses -> summarize
     graph.add_edge("debate_respond", "summarize_round")
 
-    # After summary: check if more rounds needed, fan out again or end
+    # After summary: if more rounds needed fan out again, otherwise END
     def _after_summary(state: DebateState) -> list[Send] | str:
         if state["current_round"] > state["num_rounds"]:
             return END
