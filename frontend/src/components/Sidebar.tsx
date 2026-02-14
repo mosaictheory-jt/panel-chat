@@ -14,6 +14,7 @@ export function Sidebar() {
     setHistory,
     loadSurvey,
     surveyId,
+    phase,
     setSettingsOpen,
     completedSurveys,
     visibleSurveyIds,
@@ -46,28 +47,60 @@ export function Sidebar() {
 
   const handleToggleVisibility = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
+    const isCurrentlyVisible = visibleSurveyIds.includes(id)
     const isLoaded = id in completedSurveys
+    const noActiveSurvey = !surveyId || phase === "idle"
 
-    if (isLoaded) {
-      // Already loaded — just toggle visibility
+    if (isLoaded && isCurrentlyVisible) {
+      // Hiding an already-visible item — just toggle off
       toggleSurveyVisibility(id)
       return
     }
 
-    // Not loaded yet — fetch from API, add to completed, then make visible
+    if (isLoaded && !isCurrentlyVisible) {
+      // Showing an already-loaded item
+      toggleSurveyVisibility(id)
+      // If no active chat, also set it as the active survey
+      if (noActiveSurvey) {
+        const completed = completedSurveys[id]
+        loadSurvey(
+          completed.id,
+          completed.question,
+          completed.panel,
+          completed.breakdown,
+          completed.responses,
+          [],
+        )
+      }
+      return
+    }
+
+    // Not loaded yet — fetch from API, add to completed, and make visible
     setLoadingIds((prev) => new Set(prev).add(id))
     try {
       const survey = await getSurvey(id)
-      const hasResults = survey.responses.length > 0 || survey.breakdown
-      if (hasResults) {
-        const completed: CompletedSurvey = {
-          id: survey.id,
-          question: survey.question,
-          breakdown: survey.breakdown,
-          responses: survey.responses as SurveyResponse[],
-          panel: survey.panel as unknown as Respondent[],
-        }
-        addCompletedSurvey(completed)
+      const panel = survey.panel as unknown as Respondent[]
+      const responses = survey.responses as SurveyResponse[]
+
+      const completed: CompletedSurvey = {
+        id: survey.id,
+        question: survey.question,
+        breakdown: survey.breakdown,
+        responses,
+        panel,
+      }
+      addCompletedSurvey(completed)
+
+      // If no active chat, also load as the active survey
+      if (noActiveSurvey) {
+        loadSurvey(
+          survey.id,
+          survey.question,
+          panel,
+          survey.breakdown,
+          responses,
+          survey.models,
+        )
       }
     } catch (err) {
       console.error("Failed to load survey for visibility:", err)
