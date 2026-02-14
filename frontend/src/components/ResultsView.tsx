@@ -17,7 +17,7 @@ import {
   storeChartThemeId,
 } from "@/lib/chartThemes"
 import { computeActualCost, formatCost } from "@/lib/pricing"
-import { X, EyeOff, Palette, DollarSign, MessageSquareText, Swords } from "lucide-react"
+import { X, EyeOff, Palette, DollarSign, MessageSquareText, Swords, BarChart3 } from "lucide-react"
 import type { CompletedSurvey, Respondent } from "@/types"
 
 interface ResultsViewProps {
@@ -69,7 +69,7 @@ export function ResultsView({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Theme picker — only when we have chart-based surveys */}
       {hasChartSurveys && (
         <>
@@ -155,26 +155,29 @@ export function ResultsView({
 
         // Survey with no persisted results (pre-dates data persistence)
         return (
-          <div key={survey.id} className="space-y-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-sm leading-tight">{survey.question}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {survey.panel.length} panelists
-                </p>
+          <div key={survey.id} className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+            <div className="h-1 bg-gradient-to-r from-muted-foreground/30 to-muted-foreground/20" />
+            <div className="p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-base leading-tight">{survey.question}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {survey.panel.length} panelists
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
+                  onClick={() => onHideSurvey?.(survey.id)}
+                  title="Hide from results"
+                >
+                  <EyeOff className="w-3.5 h-3.5" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
-                onClick={() => onHideSurvey?.(survey.id)}
-                title="Hide from results"
-              >
-                <EyeOff className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-            <div className="rounded-lg border border-dashed bg-muted/30 p-6 text-center text-sm text-muted-foreground">
-              Results were not saved for this session. Run a new survey or debate to see persisted results.
+              <div className="rounded-lg border border-dashed bg-muted/30 p-6 text-center text-sm text-muted-foreground">
+                Results were not saved for this session. Run a new survey or debate to see persisted results.
+              </div>
             </div>
           </div>
         )
@@ -201,47 +204,52 @@ function DebateResultGroup({
   onViewTranscript,
 }: DebateResultGroupProps) {
   return (
-    <div className="space-y-3">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="font-semibold text-sm leading-tight">{survey.question}</p>
-            <Badge className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 gap-0.5 shrink-0">
-              <Swords className="w-2.5 h-2.5" />
-              Debate
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {survey.panel.length} panelists
-            {survey.debateMessages && survey.debateMessages.length > 0 && (
-              <> · {survey.debateMessages.length} messages</>
-            )}
-            {survey.debateAnalysis && (
-              <> · {survey.debateAnalysis.themes.length} theme{survey.debateAnalysis.themes.length !== 1 ? "s" : ""}</>
-            )}
-          </p>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
-          onClick={onHide}
-          title="Hide from results"
-        >
-          <EyeOff className="w-3.5 h-3.5" />
-        </Button>
-      </div>
+    <div className="rounded-lg border border-purple-500/20 bg-card shadow-sm overflow-hidden">
+      {/* Colored top bar */}
+      <div className="h-1 bg-gradient-to-r from-purple-500 to-purple-400" />
 
-      {/* Analysis content */}
-      {survey.debateAnalysis && (
-        <DebateAnalysisView
-          analysis={survey.debateAnalysis}
-          panel={survey.panel}
-          onRespondentClick={onRespondentClick}
-          onViewTranscript={onViewTranscript}
-        />
-      )}
+      <div className="p-4 space-y-4">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-base leading-tight">{survey.question}</p>
+              <Badge className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 gap-0.5 shrink-0">
+                <Swords className="w-2.5 h-2.5" />
+                Debate
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {survey.panel.length} panelists
+              {survey.debateMessages && survey.debateMessages.length > 0 && (
+                <> · {survey.debateMessages.length} messages</>
+              )}
+              {survey.debateAnalysis && (
+                <> · {survey.debateAnalysis.themes.length} theme{survey.debateAnalysis.themes.length !== 1 ? "s" : ""}</>
+              )}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
+            onClick={onHide}
+            title="Hide from results"
+          >
+            <EyeOff className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+
+        {/* Analysis content */}
+        {survey.debateAnalysis && (
+          <DebateAnalysisView
+            analysis={survey.debateAnalysis}
+            panel={survey.panel}
+            onRespondentClick={onRespondentClick}
+            onViewTranscript={onViewTranscript}
+          />
+        )}
+      </div>
     </div>
   )
 }
@@ -292,133 +300,144 @@ function SurveyResultGroup({
   const providerEntries = Object.entries(surveyCost.perProvider)
 
   return (
-    <div className="space-y-4">
-      {/* Survey group header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-sm leading-tight">{survey.question}</p>
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            <p className="text-xs text-muted-foreground">
-              {survey.responses.length} responses · {survey.panel.length} panelists
-            </p>
-            {surveyCost.totalCost > 0 && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground cursor-default">
-                      <DollarSign className="w-3 h-3" />
-                      <span className="tabular-nums">{formatCost(surveyCost.totalCost)}</span>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-xs space-y-1 max-w-64">
-                    <p className="font-semibold">Actual cost</p>
-                    {providerEntries.map(([provider, data]) => (
-                      <div key={provider} className="flex justify-between gap-4">
-                        <span>{provider} ({data.calls} calls)</span>
-                        <span className="tabular-nums font-medium">{formatCost(data.totalCost)}</span>
-                      </div>
-                    ))}
-                    <p className="text-muted-foreground border-t pt-1">
-                      Input: {formatCost(providerEntries.reduce((s, [, d]) => s + d.inputCost, 0))}
-                      {" · "}
-                      Output: {formatCost(providerEntries.reduce((s, [, d]) => s + d.outputCost, 0))}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {onViewDebate && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground"
-              onClick={onViewDebate}
-              title="View debate transcript"
-            >
-              <MessageSquareText className="w-3.5 h-3.5" />
-              Debate
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            onClick={onHide}
-            title="Hide from results"
-          >
-            <EyeOff className="w-3.5 h-3.5" />
-          </Button>
-        </div>
-      </div>
+    <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+      {/* Colored top bar */}
+      <div className="h-1 bg-gradient-to-r from-blue-500 to-sky-400" />
 
-      {/* Charts */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {(survey.breakdown?.sub_questions ?? []).map((sq) => (
-          <SubQuestionChart
-            key={sq.id}
-            subQuestion={sq}
-            responses={survey.responses}
-            colors={colors}
-            selectedOption={drillDown?.sqId === sq.id ? drillDown.option : null}
-            onOptionClick={(sqId, option) => onOptionClick(sqId, option)}
-          />
-        ))}
-      </div>
-
-      {/* Drill-down panelist list */}
-      {drillDown && filteredResponses.length > 0 && (
-        <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">
-                Respondents who answered "{drillDown.option}"
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {drillDownQuestion?.text} — {filteredResponses.length} panelist{filteredResponses.length !== 1 ? "s" : ""}
-              </p>
+      <div className="p-4 space-y-4">
+        {/* Survey group header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-base leading-tight">{survey.question}</p>
+              <Badge className="text-[10px] bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 gap-0.5 shrink-0">
+                <BarChart3 className="w-2.5 h-2.5" />
+                Survey
+              </Badge>
             </div>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <p className="text-xs text-muted-foreground">
+                {survey.responses.length} responses · {survey.panel.length} panelists
+              </p>
+              {surveyCost.totalCost > 0 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground cursor-default">
+                        <DollarSign className="w-3 h-3" />
+                        <span className="tabular-nums">{formatCost(surveyCost.totalCost)}</span>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs space-y-1 max-w-64">
+                      <p className="font-semibold">Actual cost</p>
+                      {providerEntries.map(([provider, data]) => (
+                        <div key={provider} className="flex justify-between gap-4">
+                          <span>{provider} ({data.calls} calls)</span>
+                          <span className="tabular-nums font-medium">{formatCost(data.totalCost)}</span>
+                        </div>
+                      ))}
+                      <p className="text-muted-foreground border-t pt-1">
+                        Input: {formatCost(providerEntries.reduce((s, [, d]) => s + d.inputCost, 0))}
+                        {" · "}
+                        Output: {formatCost(providerEntries.reduce((s, [, d]) => s + d.outputCost, 0))}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            {onViewDebate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground"
+                onClick={onViewDebate}
+                title="View debate transcript"
+              >
+                <MessageSquareText className="w-3.5 h-3.5" />
+                Debate
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
-              onClick={() => onOptionClick(drillDown.sqId, null)}
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={onHide}
+              title="Hide from results"
             >
-              <X className="w-4 h-4" />
+              <EyeOff className="w-3.5 h-3.5" />
             </Button>
           </div>
-          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredResponses.map((resp) => {
-              const respondent = respondentMap.get(resp.respondent_id)
-              const avatar = getAvatar(resp.respondent_id, respondent?.role ?? null)
-              return (
-                <button
-                  key={resp.id}
-                  onClick={() => respondent && onRespondentClick?.(respondent)}
-                  className="flex items-center gap-2.5 rounded-lg border bg-background p-2.5 text-left text-xs hover:shadow-sm transition-shadow"
-                >
-                  <div className={`flex items-center justify-center w-8 h-8 rounded-full shrink-0 text-base ${avatar.colorClass}`}>
-                    {avatar.emoji}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">
-                      {respondent?.role || resp.agent_name}
-                    </p>
-                    <p className="text-muted-foreground truncate">
-                      {[respondent?.industry, respondent?.region].filter(Boolean).join(" · ")}
-                    </p>
-                  </div>
-                  <Badge variant="secondary" className="text-[9px] shrink-0">
-                    {resp.model}
-                  </Badge>
-                </button>
-              )
-            })}
-          </div>
         </div>
-      )}
+
+        {/* Charts */}
+        <div className="grid gap-6 md:grid-cols-2">
+          {(survey.breakdown?.sub_questions ?? []).map((sq) => (
+            <SubQuestionChart
+              key={sq.id}
+              subQuestion={sq}
+              responses={survey.responses}
+              colors={colors}
+              selectedOption={drillDown?.sqId === sq.id ? drillDown.option : null}
+              onOptionClick={(sqId, option) => onOptionClick(sqId, option)}
+            />
+          ))}
+        </div>
+
+        {/* Drill-down panelist list */}
+        {drillDown && filteredResponses.length > 0 && (
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">
+                  Respondents who answered "{drillDown.option}"
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {drillDownQuestion?.text} — {filteredResponses.length} panelist{filteredResponses.length !== 1 ? "s" : ""}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => onOptionClick(drillDown.sqId, null)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredResponses.map((resp) => {
+                const respondent = respondentMap.get(resp.respondent_id)
+                const avatar = getAvatar(resp.respondent_id, respondent?.role ?? null)
+                return (
+                  <button
+                    key={resp.id}
+                    onClick={() => respondent && onRespondentClick?.(respondent)}
+                    className="flex items-center gap-2.5 rounded-lg border bg-background p-2.5 text-left text-xs hover:shadow-sm transition-shadow"
+                  >
+                    <div className={`flex items-center justify-center w-8 h-8 rounded-full shrink-0 text-base ${avatar.colorClass}`}>
+                      {avatar.emoji}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">
+                        {respondent?.role || resp.agent_name}
+                      </p>
+                      <p className="text-muted-foreground truncate">
+                        {[respondent?.industry, respondent?.region].filter(Boolean).join(" · ")}
+                      </p>
+                    </div>
+                    <Badge variant="secondary" className="text-[9px] shrink-0">
+                      {resp.model}
+                    </Badge>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

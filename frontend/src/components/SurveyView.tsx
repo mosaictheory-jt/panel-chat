@@ -297,9 +297,24 @@ export function SurveyView() {
             <Badge variant="outline" className="text-xs">
               {modelCount} model{modelCount !== 1 ? "s" : ""}
             </Badge>
-            {phase === "complete" && (
+            {phase === "complete" && !isDebate && responses.length > 0 && (
               <Badge className="text-xs bg-emerald-500/10 text-emerald-700 border-emerald-500/30">
                 {responses.length} responses
+              </Badge>
+            )}
+            {phase === "complete" && isDebate && debateMessages.length > 0 && (
+              <Badge className="text-xs bg-emerald-500/10 text-emerald-700 border-emerald-500/30">
+                {debateMessages.length} messages · {roundSummaries.length} rounds
+              </Badge>
+            )}
+            {phase === "complete" && isDebate && debateAnalysis && (
+              <Badge className="text-xs bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30">
+                {debateAnalysis.themes.length} theme{debateAnalysis.themes.length !== 1 ? "s" : ""} identified
+              </Badge>
+            )}
+            {phase === "complete" && !isDebate && responses.length === 0 && !breakdown && (
+              <Badge className="text-xs bg-muted text-muted-foreground border-border">
+                No persisted results
               </Badge>
             )}
             {phase === "running" && !isDebate && (
