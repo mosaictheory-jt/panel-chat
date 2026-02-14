@@ -206,6 +206,13 @@ export function SurveyView() {
     prevPhaseRef.current = phase
   }, [phase])
 
+  // When a completed survey is loaded from history, show results tab directly
+  useEffect(() => {
+    if (phase === "complete" && surveyId) {
+      setActiveTab("charts")
+    }
+  }, [surveyId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Reset to panelists tab when a new survey starts running
   useEffect(() => {
     if (phase === "running") {
@@ -213,7 +220,8 @@ export function SurveyView() {
     }
   }, [phase === "running"])
 
-  const isDebate = chatMode === "debate" && totalRounds > 1
+  // Detect debate from either the active chat mode setting OR from loaded historical data
+  const isDebate = (chatMode === "debate" && totalRounds > 1) || debateMessages.length > 0 || debateAnalysis !== null
   const responsesPerRound = totalExpected
   // In debate mode: all rounds produce debate messages (no final vote)
   const currentRoundItems = isDebate
