@@ -160,7 +160,7 @@ function SurveyResultGroup({
     )
   }, [drillDown, survey.responses])
 
-  const drillDownQuestion = drillDown
+  const drillDownQuestion = drillDown && survey.breakdown
     ? survey.breakdown.sub_questions.find((sq) => sq.id === drillDown.sqId)
     : null
 
@@ -236,7 +236,7 @@ function SurveyResultGroup({
 
       {/* Charts */}
       <div className="grid gap-6 md:grid-cols-2">
-        {survey.breakdown.sub_questions.map((sq) => (
+        {(survey.breakdown?.sub_questions ?? []).map((sq) => (
           <SubQuestionChart
             key={sq.id}
             subQuestion={sq}

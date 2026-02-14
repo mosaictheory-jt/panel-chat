@@ -3,8 +3,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { getAvatar } from "@/lib/avatar"
-import { MessageSquare, Vote, Sparkles, ChevronLeft, ChevronRight } from "lucide-react"
-import type { DebateMessage, RoundSummary, Respondent, SurveyResponse, QuestionBreakdown } from "@/types"
+import { MessageSquare, Sparkles, ChevronLeft, ChevronRight } from "lucide-react"
+import type { DebateMessage, RoundSummary, Respondent, QuestionBreakdown } from "@/types"
 import ReactMarkdown from "react-markdown"
 
 interface DebateTranscriptProps {
@@ -13,17 +13,14 @@ interface DebateTranscriptProps {
   question: string
   debateMessages: DebateMessage[]
   roundSummaries: RoundSummary[]
-  responses: SurveyResponse[]
-  breakdown: QuestionBreakdown
+  breakdown?: QuestionBreakdown | null
   panel: Respondent[]
 }
 
 interface RoundData {
   number: number
-  type: "discussion" | "vote"
   messages: DebateMessage[]
   summary: string | null
-  votes: SurveyResponse[]
 }
 
 export function DebateTranscript({
@@ -32,8 +29,6 @@ export function DebateTranscript({
   question,
   debateMessages,
   roundSummaries,
-  responses,
-  breakdown,
   panel,
 }: DebateTranscriptProps) {
   const [activeRound, setActiveRound] = useState(1)
@@ -48,7 +43,6 @@ export function DebateTranscript({
     const maxRound = Math.max(
       ...debateMessages.map((m) => m.round),
       ...roundSummaries.map((s) => s.round),
-      ...responses.filter((r) => r.round).map((r) => r.round!),
       0,
     )
 
@@ -57,38 +51,16 @@ export function DebateTranscript({
     for (let i = 1; i <= maxRound; i++) {
       const msgs = debateMessages.filter((m) => m.round === i)
       const summary = roundSummaries.find((s) => s.round === i)?.summary ?? null
-      const votes = responses.filter((r) => r.round === i)
 
       result.push({
         number: i,
-        type: votes.length > 0 ? "vote" : "discussion",
         messages: msgs,
         summary,
-        votes,
-      })
-    }
-
-    const votesWithoutRound = responses.filter((r) => !r.round)
-    if (votesWithoutRound.length > 0 && result.every((r) => r.votes.length === 0)) {
-      result.push({
-        number: maxRound + 1,
-        type: "vote",
-        messages: [],
-        summary: null,
-        votes: votesWithoutRound,
       })
     }
 
     return result
-  }, [debateMessages, roundSummaries, responses])
-
-  const sqLookup = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const sq of breakdown.sub_questions) {
-      map.set(sq.id, sq.text)
-    }
-    return map
-  }, [breakdown])
+  }, [debateMessages, roundSummaries])
 
   const currentRound = rounds.find((r) => r.number === activeRound) ?? rounds[0]
   const totalRounds = rounds.length
@@ -125,18 +97,12 @@ export function DebateTranscript({
                     onClick={() => setActiveRound(round.number)}
                     className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors ${
                       round.number === activeRound
-                        ? round.type === "vote"
-                          ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/30"
-                          : "bg-primary/15 text-primary ring-1 ring-primary/30"
+                        ? "bg-primary/15 text-primary ring-1 ring-primary/30"
                         : "bg-muted hover:bg-muted/80 text-muted-foreground"
                     }`}
                   >
-                    {round.type === "vote" ? (
-                      <Vote className="w-3 h-3" />
-                    ) : (
-                      <MessageSquare className="w-3 h-3" />
-                    )}
-                    {round.type === "vote" ? "Vote" : `R${round.number}`}
+                    <MessageSquare className="w-3 h-3" />
+                    R{round.number}
                   </button>
                 ))}
               </div>
@@ -160,21 +126,12 @@ export function DebateTranscript({
             <div className="px-5 py-4 space-y-3">
               {/* Round heading */}
               <div className="flex items-center gap-2">
-                {currentRound.type === "vote" ? (
-                  <Badge className="gap-1 bg-emerald-500/10 text-emerald-700 border-emerald-500/30 text-xs">
-                    <Vote className="w-3 h-3" />
-                    Final Vote
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="gap-1 text-xs">
-                    <MessageSquare className="w-3 h-3" />
-                    Round {currentRound.number} Discussion
-                  </Badge>
-                )}
+                <Badge variant="outline" className="gap-1 text-xs">
+                  <MessageSquare className="w-3 h-3" />
+                  Round {currentRound.number} Discussion
+                </Badge>
                 <span className="text-[10px] text-muted-foreground">
-                  {currentRound.type === "vote"
-                    ? `${currentRound.votes.length} votes`
-                    : `${currentRound.messages.length} responses`}
+                  {currentRound.messages.length} responses
                 </span>
               </div>
 
@@ -220,40 +177,7 @@ export function DebateTranscript({
                 </div>
               )}
 
-              {/* Final vote results */}
-              {currentRound.votes.length > 0 && (
-                <div className="space-y-2">
-                  {currentRound.votes.map((vote) => {
-                    const respondent = respondentMap.get(vote.respondent_id)
-                    const avatar = getAvatar(vote.respondent_id, respondent?.role ?? null)
-                    return (
-                      <div
-                        key={vote.id}
-                        className="flex gap-2.5 rounded-lg border bg-emerald-500/5 p-2.5"
-                      >
-                        <div className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 text-xs ${avatar.colorClass}`}>
-                          {avatar.emoji}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <span className="text-[11px] font-medium">
-                            {respondent?.role || vote.agent_name}
-                          </span>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {Object.entries(vote.answers).map(([sqId, answer]) => (
-                              <Badge key={sqId} variant="secondary" className="text-[9px] gap-0.5">
-                                <span className="text-muted-foreground">{sqLookup.get(sqId) ?? sqId}:</span>
-                                {" "}{answer}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              {currentRound.messages.length === 0 && currentRound.votes.length === 0 && (
+              {currentRound.messages.length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-6">
                   Waiting for responses...
                 </p>

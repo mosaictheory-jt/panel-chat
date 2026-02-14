@@ -2,7 +2,7 @@ import { useCallback, useRef } from "react"
 import { createSurvey, analyzeSurvey, submitBreakdown, listSurveys } from "@/api/client"
 import { connectSurveyWS } from "@/api/ws"
 import { useSurveyStore } from "@/store/surveyStore"
-import type { DebateMessage, QuestionBreakdown, SurveyResponse, WSMessage } from "@/types"
+import type { DebateAnalysis, DebateMessage, QuestionBreakdown, SurveyResponse, WSMessage } from "@/types"
 import { getModelProvider, getProviderKey } from "@/types"
 
 export function useSurvey() {
@@ -18,70 +18,22 @@ export function useSurvey() {
     }
   }, [store])
 
-  const startSurvey = useCallback(
-    async (question: string) => {
+  /** Connect WS and run the graph (shared between survey and debate modes). */
+  const connectAndRun = useCallback(
+    (surveyId: string, chatMode: "survey" | "debate", numRounds: number) => {
       // Clean up existing WS
       if (wsRef.current) {
         wsRef.current.close()
         wsRef.current = null
       }
-
-      const activeFilters: Record<string, string[]> = {}
-      for (const [key, values] of Object.entries(store.filters)) {
-        if (values && values.length > 0) {
-          activeFilters[key] = values
-        }
-      }
-
-      // Create survey
-      const session = await createSurvey({
-        question,
-        panel_size: store.panelSize,
-        filters: Object.keys(activeFilters).length > 0 ? activeFilters : null,
-        models: store.selectedModels,
-        analyzer_model: store.analyzerModel,
-      })
-
-      store.startAnalysis(session.id, question, session.panel as never[], session.models)
-
-      // Run analysis — find the API key for the analyzer model
-      const analyzerProvider = getProviderKey(getModelProvider(store.analyzerModel))
-      const analyzerApiKey = store.apiKeys[analyzerProvider]
-
-      try {
-        const breakdown = await analyzeSurvey(session.id, store.analyzerModel, analyzerApiKey)
-        store.setBreakdown(breakdown)
-      } catch (err) {
-        store.setError(err instanceof Error ? err.message : "Analysis failed")
-      }
-    },
-    [store],
-  )
-
-  const runSurvey = useCallback(
-    async (breakdown: QuestionBreakdown) => {
-      if (!store.surveyId) return
-
-      // Clean up existing WS
-      if (wsRef.current) {
-        wsRef.current.close()
-        wsRef.current = null
-      }
-
-      // Submit the (possibly edited) breakdown
-      await submitBreakdown(store.surveyId, breakdown)
-
-      const chatMode = store.chatMode
-      const numRounds = chatMode === "debate" ? store.debateRounds : 1
 
       store.startRunning()
       if (chatMode === "debate") {
         store.setRound(1, numRounds)
       }
 
-      // Connect WebSocket
       const ws = connectSurveyWS(
-        store.surveyId,
+        surveyId,
         store.apiKeys,
         store.modelTemperatures,
         {
@@ -109,6 +61,11 @@ export function useSurvey() {
               store.setRound(round + 1, totalRounds)
               break
             }
+            case "debate_analysis": {
+              const analysis = msg.data as unknown as DebateAnalysis
+              store.setDebateAnalysis(analysis)
+              break
+            }
             case "survey_done": {
               store.setSurveyDone()
               refreshHistory()
@@ -131,6 +88,68 @@ export function useSurvey() {
       wsRef.current = ws
     },
     [store, refreshHistory],
+  )
+
+  const startSurvey = useCallback(
+    async (question: string) => {
+      // Clean up existing WS
+      if (wsRef.current) {
+        wsRef.current.close()
+        wsRef.current = null
+      }
+
+      const activeFilters: Record<string, string[]> = {}
+      for (const [key, values] of Object.entries(store.filters)) {
+        if (values && values.length > 0) {
+          activeFilters[key] = values
+        }
+      }
+
+      // Create survey
+      const session = await createSurvey({
+        question,
+        panel_size: store.panelSize,
+        filters: Object.keys(activeFilters).length > 0 ? activeFilters : null,
+        models: store.selectedModels,
+        analyzer_model: store.analyzerModel,
+      })
+
+      store.startAnalysis(session.id, question, session.panel as never[], session.models)
+
+      // Debate mode: skip analysis, go straight to running
+      if (store.chatMode === "debate") {
+        const numRounds = store.debateRounds
+        connectAndRun(session.id, "debate", numRounds)
+        return
+      }
+
+      // Survey mode: run analyzer to break down the question
+      const analyzerProvider = getProviderKey(getModelProvider(store.analyzerModel))
+      const analyzerApiKey = store.apiKeys[analyzerProvider]
+
+      try {
+        const breakdown = await analyzeSurvey(session.id, store.analyzerModel, analyzerApiKey)
+        store.setBreakdown(breakdown)
+      } catch (err) {
+        store.setError(err instanceof Error ? err.message : "Analysis failed")
+      }
+    },
+    [store, connectAndRun],
+  )
+
+  const runSurvey = useCallback(
+    async (breakdown: QuestionBreakdown) => {
+      if (!store.surveyId) return
+
+      // Submit the (possibly edited) breakdown
+      await submitBreakdown(store.surveyId, breakdown)
+
+      const chatMode = store.chatMode
+      const numRounds = chatMode === "debate" ? store.debateRounds : 1
+
+      connectAndRun(store.surveyId, chatMode, numRounds)
+    },
+    [store, connectAndRun],
   )
 
   return { startSurvey, runSurvey, refreshHistory }

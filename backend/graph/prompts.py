@@ -55,19 +55,16 @@ IMPORTANT:
 - Return ONLY the JSON object, no other text."""
 
 # ---------------------------------------------------------------------------
-# Debate mode prompts
+# Debate mode prompts — all rounds are open-ended discussion
 # ---------------------------------------------------------------------------
 
 DEBATE_DISCUSS_USER = """You're in a panel discussion about this question:
 
 "{question}"
 
-The question will eventually be voted on with these options:
-{sub_questions_text}
+This is Round {round_number} of {num_rounds}. Share your honest perspective.
 
-This is Round {round_number} of {num_rounds}. The final round will be a structured vote — right now, share your honest perspective.
-
-Write a 2-4 sentence response explaining your position. Be specific and draw on your actual experience. Where do you stand on this question and why? What would you pick and what's your reasoning?"""
+Write a 2-4 sentence response explaining your position. Be specific and draw on your actual experience. Where do you stand on this question and why?"""
 
 DEBATE_DISCUSS_FOLLOWUP_USER = """You're in Round {round_number} of {num_rounds} in a panel discussion about:
 
@@ -77,30 +74,7 @@ Here's what emerged from the group's discussion so far:
 
 {prior_round_summary}
 
-The final round ({num_rounds}) will be a structured vote on:
-{sub_questions_text}
-
 Now respond. You may hold your position, shift it, or refine it. In 2-4 sentences, share where you stand now and why. Reference what others said if it influenced your thinking. Be direct."""
-
-DEBATE_VOTE_USER = """This is the FINAL round of the debate. Time to cast your vote.
-
-You've been discussing: "{question}"
-
-Here's the full summary of the group discussion across all prior rounds:
-
-{prior_round_summary}
-
-Now choose your answer for each sub-question. Your vote should reflect your final position after hearing everyone's arguments.
-
-Sub-questions:
-{sub_questions_text}
-
-Respond with a JSON object mapping each sub-question ID to your chosen option. Example:
-{{"sq_1": "Option A", "sq_2": "Option B"}}
-
-IMPORTANT:
-- You MUST pick one of the listed options for each sub-question. Do not invent new options.
-- Return ONLY the JSON object, no other text."""
 
 DEBATE_SUMMARY_SYSTEM = """You are a neutral moderator summarizing a panel debate round. Be concise but capture the key positions, points of agreement, and tensions. Include counts where relevant."""
 
@@ -118,6 +92,34 @@ Write a 3-5 sentence summary that:
 3. Notes any compelling arguments or strong stances
 
 This summary will be shown to panelists before the next round to inform their thinking."""
+
+# ---------------------------------------------------------------------------
+# Debate analysis — final thematic extraction after all discussion rounds
+# ---------------------------------------------------------------------------
+
+DEBATE_ANALYSIS_SYSTEM = """You are an expert qualitative researcher analyzing a multi-round panel discussion. Your job is to perform thematic analysis: identify distinct position clusters, map respondents to them, and synthesize the overall debate outcome.
+
+Think like a researcher doing grounded-theory coding:
+1. Read all responses across all rounds to understand each panelist's trajectory
+2. Identify natural clusters of opinion — people who share similar positions, reasoning, or values
+3. Label each cluster with a vivid, descriptive name (not generic like "Group A")
+4. Note where panelists shifted positions between rounds — this signals persuasive arguments
+5. Extract consensus points (where most agree) and key tensions (where they diverge)
+
+Be precise about which respondent IDs belong to which cluster. One respondent belongs to exactly one cluster."""
+
+DEBATE_ANALYSIS_USER = """Analyze this {num_rounds}-round panel debate and extract the key themes.
+
+**Question:** "{question}"
+
+**Panelists ({num_panelists} total):**
+{panelist_roster}
+
+**Full Discussion Transcript:**
+
+{full_transcript}
+
+Identify the distinct position clusters, assign every panelist to exactly one cluster, extract key arguments, note consensus points and tensions, and write an overall synthesis."""
 
 ANALYZER_SYSTEM = """You are a survey design expert. Your job is to take the user's input and turn each distinct question into a structured sub-question with categorical answer options.
 

@@ -46,18 +46,10 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
             await websocket.close()
             return
 
-        if not session.breakdown:
-            await websocket.send_json({"type": "error", "data": {"message": "No breakdown configured"}})
-            await websocket.close()
-            return
-
-        sub_questions_dicts = [sq.model_dump() for sq in session.breakdown.sub_questions]
-
         if chat_mode == "debate":
             graph = build_debate_graph()
             initial_state = {
                 "question": session.question,
-                "sub_questions": sub_questions_dicts,
                 "panel": session.panel,
                 "models": session.models,
                 "api_keys": api_keys,
@@ -67,10 +59,16 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
                 "num_rounds": num_rounds,
                 "current_round": 1,
                 "prior_round_summary": "",
-                "responses": [],
                 "debate_messages": [],
+                "analysis": None,
             }
         else:
+            if not session.breakdown:
+                await websocket.send_json({"type": "error", "data": {"message": "No breakdown configured"}})
+                await websocket.close()
+                return
+
+            sub_questions_dicts = [sq.model_dump() for sq in session.breakdown.sub_questions]
             graph = build_survey_graph()
             initial_state = {
                 "question": session.question,
@@ -111,8 +109,7 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
                 break
 
             for node_name, node_output in item.items():
-                if node_name in ("survey_respond", "debate_respond"):
-                    # Structured vote responses (survey mode, or final debate round)
+                if node_name == "survey_respond":
                     responses = node_output.get("responses", [])
                     for resp in responses:
                         saved = save_response(
@@ -131,12 +128,11 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
                                 "agent_name": resp["agent_name"],
                                 "model": resp["model"],
                                 "answers": resp["answers"],
-                                "round": resp.get("round"),
                                 "token_usage": resp.get("token_usage"),
                             },
                         })
 
-                    # Open-ended debate discussion messages
+                elif node_name == "debate_respond":
                     debate_messages = node_output.get("debate_messages", [])
                     for msg in debate_messages:
                         await websocket.send_json({
@@ -152,7 +148,6 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
                         })
 
                 elif node_name == "summarize_round":
-                    # Notify frontend that a round has completed
                     current_round = node_output.get("current_round", 1)
                     summary = node_output.get("prior_round_summary", "")
                     await websocket.send_json({
@@ -163,6 +158,14 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
                             "summary": summary,
                         },
                     })
+
+                elif node_name == "analyze_debate":
+                    analysis = node_output.get("analysis")
+                    if analysis:
+                        await websocket.send_json({
+                            "type": "debate_analysis",
+                            "data": analysis,
+                        })
 
         await websocket.send_json({
             "type": "survey_done",

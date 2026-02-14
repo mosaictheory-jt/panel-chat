@@ -86,14 +86,31 @@ export interface SurveySummary {
   created_at: string | null
 }
 
+export interface DebateTheme {
+  label: string
+  description: string
+  respondent_ids: number[]
+  key_arguments: string[]
+  sentiment: "positive" | "negative" | "mixed" | "neutral"
+}
+
+export interface DebateAnalysis {
+  themes: DebateTheme[]
+  consensus_points: string[]
+  key_tensions: string[]
+  synthesis: string
+  token_usage?: TokenUsage | null
+}
+
 export interface CompletedSurvey {
   id: string
   question: string
-  breakdown: QuestionBreakdown
+  breakdown: QuestionBreakdown | null
   responses: SurveyResponse[]
   panel: Respondent[]
   debateMessages?: DebateMessage[]
   roundSummaries?: RoundSummary[]
+  debateAnalysis?: DebateAnalysis | null
 }
 
 export interface DebateMessage {
@@ -112,7 +129,7 @@ export interface RoundSummary {
 }
 
 export interface WSMessage {
-  type: "survey_response" | "survey_done" | "round_complete" | "debate_message" | "error"
+  type: "survey_response" | "survey_done" | "round_complete" | "debate_message" | "debate_analysis" | "error"
   data: Record<string, unknown>
 }
 

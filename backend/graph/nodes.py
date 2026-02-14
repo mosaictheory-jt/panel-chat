@@ -9,10 +9,12 @@ from backend.graph.prompts import (
     SURVEY_USER,
     DEBATE_DISCUSS_USER,
     DEBATE_DISCUSS_FOLLOWUP_USER,
-    DEBATE_VOTE_USER,
     DEBATE_SUMMARY_SYSTEM,
     DEBATE_SUMMARY_USER,
+    DEBATE_ANALYSIS_SYSTEM,
+    DEBATE_ANALYSIS_USER,
 )
+from backend.models.survey import DebateAnalysis
 from backend.services.llm import get_llm
 from backend.services.history import get_respondent_history
 
@@ -209,14 +211,13 @@ def survey_respond(state: SurveyAgentState) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Debate mode: open-ended discussion rounds, then final structured vote
+# Debate mode: all rounds are open-ended discussion, then thematic analysis
 # ---------------------------------------------------------------------------
 
 def debate_respond(state: DebateAgentState) -> dict:
-    """Persona participates in debate — open-ended for discussion rounds, structured for final vote."""
+    """Persona participates in an open-ended discussion round."""
     respondent = state["respondent"]
     agent_name = state["agent_name"]
-    sub_questions = state["sub_questions"]
     question = state["question"]
     model = state["model"]
     api_key = state["api_key"]
@@ -228,32 +229,19 @@ def debate_respond(state: DebateAgentState) -> dict:
     prior_round_summary = state.get("prior_round_summary", "")
 
     system_prompt = _build_system_prompt(respondent, survey_id, persona_memory)
-    is_final_round = round_number == num_rounds
-    sq_text = _format_sub_questions(sub_questions)
 
-    if is_final_round:
-        # Final round: structured vote
-        user_prompt = DEBATE_VOTE_USER.format(
-            question=question,
-            prior_round_summary=prior_round_summary,
-            sub_questions_text=sq_text,
-        )
-    elif round_number == 1 or not prior_round_summary:
-        # First discussion round
+    if round_number == 1 or not prior_round_summary:
         user_prompt = DEBATE_DISCUSS_USER.format(
             question=question,
             round_number=round_number,
             num_rounds=num_rounds,
-            sub_questions_text=sq_text,
         )
     else:
-        # Follow-up discussion round
         user_prompt = DEBATE_DISCUSS_FOLLOWUP_USER.format(
             question=question,
             round_number=round_number,
             num_rounds=num_rounds,
             prior_round_summary=prior_round_summary,
-            sub_questions_text=sq_text,
         )
 
     llm = get_llm(model, api_key, temperature=temperature)
@@ -264,31 +252,16 @@ def debate_respond(state: DebateAgentState) -> dict:
 
     token_usage = _extract_token_usage(response)
 
-    if is_final_round:
-        # Parse structured vote
-        answers = _parse_answers(response.content, sub_questions)
-        return {
-            "responses": [{
-                "respondent_id": respondent["id"],
-                "agent_name": agent_name,
-                "model": model,
-                "answers": answers,
-                "round": round_number,
-                "token_usage": token_usage,
-            }]
-        }
-    else:
-        # Open-ended discussion message
-        return {
-            "debate_messages": [{
-                "respondent_id": respondent["id"],
-                "agent_name": agent_name,
-                "model": model,
-                "round": round_number,
-                "text": response.content.strip(),
-                "token_usage": token_usage,
-            }]
-        }
+    return {
+        "debate_messages": [{
+            "respondent_id": respondent["id"],
+            "agent_name": agent_name,
+            "model": model,
+            "round": round_number,
+            "text": response.content.strip(),
+            "token_usage": token_usage,
+        }]
+    }
 
 
 def summarize_round(state: DebateState) -> dict:
@@ -297,10 +270,8 @@ def summarize_round(state: DebateState) -> dict:
     question = state["question"]
     current_round = state["current_round"]
 
-    # Filter messages for the current round
     round_messages = [m for m in debate_messages if m.get("round") == current_round]
 
-    # Build the responses text
     response_lines = []
     for msg in round_messages:
         response_lines.append(f"**{msg['agent_name']}**: {msg['text']}")
@@ -328,3 +299,82 @@ def summarize_round(state: DebateState) -> dict:
         "prior_round_summary": response.content.strip(),
         "current_round": current_round + 1,
     }
+
+
+def analyze_debate(state: DebateState) -> dict:
+    """After all discussion rounds, perform thematic analysis of the full debate."""
+    debate_messages = state.get("debate_messages", [])
+    question = state["question"]
+    panel = state["panel"]
+    num_rounds = state["num_rounds"]
+
+    # Build panelist roster
+    roster_lines = []
+    for p in panel:
+        role = p.get("role", "Unknown")
+        industry = p.get("industry", "Unknown")
+        region = p.get("region", "Unknown")
+        roster_lines.append(f"- ID {p['id']}: {role} in {industry} ({region})")
+    panelist_roster = "\n".join(roster_lines)
+
+    # Build full transcript organized by round
+    transcript_parts = []
+    for round_num in range(1, num_rounds + 1):
+        round_msgs = [m for m in debate_messages if m.get("round") == round_num]
+        if not round_msgs:
+            continue
+        transcript_parts.append(f"### Round {round_num}")
+        for msg in round_msgs:
+            transcript_parts.append(
+                f"**{msg['agent_name']}** (ID {msg['respondent_id']}): {msg['text']}"
+            )
+        transcript_parts.append("")
+    full_transcript = "\n\n".join(transcript_parts)
+
+    llm = _get_summary_llm(state)
+    if not llm:
+        logger.error("No model with a valid API key available for debate analysis")
+        return {
+            "analysis": {
+                "themes": [],
+                "consensus_points": [],
+                "key_tensions": [],
+                "synthesis": "Unable to generate analysis — no API key available.",
+            }
+        }
+
+    # Use structured output for reliable thematic extraction
+    structured_llm = llm.with_structured_output(DebateAnalysis)
+
+    analysis_prompt = DEBATE_ANALYSIS_USER.format(
+        question=question,
+        num_rounds=num_rounds,
+        num_panelists=len(panel),
+        panelist_roster=panelist_roster,
+        full_transcript=full_transcript,
+    )
+
+    try:
+        result: DebateAnalysis = structured_llm.invoke([
+            SystemMessage(content=DEBATE_ANALYSIS_SYSTEM),
+            HumanMessage(content=analysis_prompt),
+        ])
+        token_usage = None  # structured output doesn't always expose usage
+        analysis_dict = result.model_dump()
+        analysis_dict["token_usage"] = token_usage
+    except Exception:
+        logger.exception("Structured analysis failed, falling back to unstructured")
+        # Fallback: get raw text and return a minimal analysis
+        raw_response = llm.invoke([
+            SystemMessage(content=DEBATE_ANALYSIS_SYSTEM),
+            HumanMessage(content=analysis_prompt),
+        ])
+        analysis_dict = {
+            "themes": [],
+            "consensus_points": [],
+            "key_tensions": [],
+            "synthesis": raw_response.content.strip(),
+            "token_usage": _extract_token_usage(raw_response),
+        }
+
+    return {"analysis": analysis_dict}

@@ -5,12 +5,13 @@ import { ResultsView } from "./ResultsView"
 import { ResponseCard } from "./ResponseCard"
 import { PersonaDetail } from "./PersonaDetail"
 import { DebateTranscript } from "./DebateTranscript"
+import { DebateAnalysisView } from "./DebateAnalysisView"
 import { CostBadge } from "./CostBadge"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getAvatar } from "@/lib/avatar"
-import { ClipboardList, Loader2, Users, BarChart3, MessageSquareText } from "lucide-react"
+import { ClipboardList, Loader2, Users, BarChart3, Lightbulb, MessageSquareText } from "lucide-react"
 import type { CompletedSurvey, DebateMessage, Respondent, SurveyResponse } from "@/types"
 
 interface MergedPanelist {
@@ -45,6 +46,7 @@ export function SurveyView() {
     totalRounds,
     debateMessages,
     roundSummaries,
+    debateAnalysis,
   } = useSurveyStore()
 
   const [selectedRespondent, setSelectedRespondent] = useState<Respondent | null>(null)
@@ -179,7 +181,7 @@ export function SurveyView() {
 
   // For the live/running debate — build a "live" CompletedSurvey for the transcript
   const openLiveDebateTranscript = () => {
-    if (!surveyId || !question || !breakdown) return
+    if (!surveyId || !question) return
     setDebateTranscriptSurvey({
       id: surveyId,
       question,
@@ -188,6 +190,7 @@ export function SurveyView() {
       panel,
       debateMessages,
       roundSummaries,
+      debateAnalysis,
     })
     setDebateTranscriptOpen(true)
   }
@@ -209,17 +212,16 @@ export function SurveyView() {
 
   const isDebate = chatMode === "debate" && totalRounds > 1
   const responsesPerRound = totalExpected
-  // In debate mode: discussion rounds produce debateMessages, final round produces responses
-  const isFinalRound = isDebate && currentRound === totalRounds
+  // In debate mode: all rounds produce debate messages (no final vote)
   const currentRoundItems = isDebate
-    ? isFinalRound
-      ? responses.filter((r) => r.round === currentRound).length
-      : debateMessages.filter((m) => m.round === currentRound).length
+    ? debateMessages.filter((m) => m.round === currentRound).length
     : responses.length
   const currentRoundTotal = isDebate ? responsesPerRound : totalExpected
   const progressPercent = currentRoundTotal > 0
     ? Math.round((currentRoundItems / currentRoundTotal) * 100)
     : 0
+  // In debate mode after all rounds, we're waiting for analysis
+  const isAnalyzing = isDebate && phase === "running" && currentRound > totalRounds
 
   // Idle — empty state
   if (phase === "idle" && !question && visibleSurveys.length === 0) {
@@ -238,16 +240,38 @@ export function SurveyView() {
     )
   }
 
-  // If idle but we have visible past results, show only the charts
+  // If idle but we have visible past results, show only the charts/analyses
+  const surveySurveys = visibleSurveys.filter((s) => s.breakdown !== null)
+  const debateSurveys = visibleSurveys.filter((s) => s.debateAnalysis)
+
   if ((phase === "idle" || phase === "complete") && !question && visibleSurveys.length > 0) {
     return (
       <div className="space-y-6 pb-4">
-        <ResultsView
-          surveys={visibleSurveys}
-          onHideSurvey={removeSurveyFromResults}
-          onRespondentClick={openPersonaDetail}
-          onViewDebate={openDebateTranscript}
-        />
+        {surveySurveys.length > 0 && (
+          <ResultsView
+            surveys={surveySurveys}
+            onHideSurvey={removeSurveyFromResults}
+            onRespondentClick={openPersonaDetail}
+            onViewDebate={openDebateTranscript}
+          />
+        )}
+        {debateSurveys.map((survey) => (
+          <div key={survey.id} className="space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <p className="font-semibold text-sm leading-tight">{survey.question}</p>
+            </div>
+            <DebateAnalysisView
+              analysis={survey.debateAnalysis!}
+              panel={survey.panel}
+              onRespondentClick={openPersonaDetail}
+              onViewTranscript={
+                survey.debateMessages && survey.debateMessages.length > 0
+                  ? () => openDebateTranscript(survey)
+                  : undefined
+              }
+            />
+          </div>
+        ))}
         <PersonaDetail
           respondent={selectedRespondent}
           visibleSurveys={visibleSurveys}
@@ -261,8 +285,6 @@ export function SurveyView() {
             question={debateTranscriptSurvey.question}
             debateMessages={debateTranscriptSurvey.debateMessages ?? []}
             roundSummaries={debateTranscriptSurvey.roundSummaries ?? []}
-            responses={debateTranscriptSurvey.responses}
-            breakdown={debateTranscriptSurvey.breakdown}
             panel={debateTranscriptSurvey.panel}
           />
         )}
@@ -270,7 +292,7 @@ export function SurveyView() {
     )
   }
 
-  const showTabs = phase === "running" || phase === "complete"
+  const showTabs = (phase === "running" || phase === "complete") && (breakdown || isDebate)
   const uniquePanelistCount = mergedPanelists.length
 
   return (
@@ -296,17 +318,23 @@ export function SurveyView() {
                 {responses.length} / {totalExpected} responses
               </Badge>
             )}
-            {phase === "running" && isDebate && (
+            {phase === "running" && isDebate && !isAnalyzing && (
               <>
                 <Badge className="text-xs bg-purple-500/10 text-purple-700 border-purple-500/30">
                   Round {currentRound} / {totalRounds}
                 </Badge>
                 <Badge className="text-xs bg-blue-500/10 text-blue-700 border-blue-500/30">
-                  {currentRoundItems} / {currentRoundTotal} {isFinalRound ? "votes" : "responses"}
+                  {currentRoundItems} / {currentRoundTotal} responses
                 </Badge>
               </>
             )}
-            {(phase === "running" || phase === "complete") && breakdown && (
+            {isAnalyzing && (
+              <Badge className="text-xs bg-amber-500/10 text-amber-700 border-amber-500/30 gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Analyzing debate...
+              </Badge>
+            )}
+            {(phase === "running" || phase === "complete") && breakdown && !isDebate && (
               <CostBadge
                 responses={responses}
                 models={surveyModels}
@@ -337,7 +365,7 @@ export function SurveyView() {
       )}
 
       {/* Tabbed results (running or complete) */}
-      {showTabs && breakdown && (
+      {showTabs && (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="w-full">
             <TabsTrigger value="panelists" className="flex-1 gap-2">
@@ -345,9 +373,13 @@ export function SurveyView() {
               Panelists ({uniquePanelistCount})
             </TabsTrigger>
             <TabsTrigger value="charts" className="flex-1 gap-2">
-              <BarChart3 className="w-4 h-4" />
-              Results
-              {visibleSurveys.length > 1 && (
+              {isDebate ? (
+                <Lightbulb className="w-4 h-4" />
+              ) : (
+                <BarChart3 className="w-4 h-4" />
+              )}
+              {isDebate ? "Analysis" : "Results"}
+              {!isDebate && visibleSurveys.length > 1 && (
                 <Badge variant="secondary" className="text-[10px] ml-1">
                   {visibleSurveys.length}
                 </Badge>
@@ -357,17 +389,23 @@ export function SurveyView() {
 
           <TabsContent value="panelists" className="mt-4 space-y-4">
             {/* Progress bar */}
-            {phase === "running" && (
+            {phase === "running" && !isAnalyzing && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>
                     {isDebate
-                      ? `Round ${currentRound}: ${currentRoundItems} of ${currentRoundTotal} ${isFinalRound ? "votes" : "responses"}`
+                      ? `Round ${currentRound}: ${currentRoundItems} of ${currentRoundTotal} responses`
                       : `${responses.length} of ${totalExpected} responses collected`}
                   </span>
                   <span className="font-medium tabular-nums">{progressPercent}%</span>
                 </div>
                 <Progress value={progressPercent} className="h-2" />
+              </div>
+            )}
+            {isAnalyzing && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>All rounds complete. Analyzing debate themes...</span>
               </div>
             )}
 
@@ -449,12 +487,37 @@ export function SurveyView() {
           </TabsContent>
 
           <TabsContent value="charts" className="mt-4">
-            <ResultsView
-              surveys={visibleSurveys}
-              onHideSurvey={removeSurveyFromResults}
-              onRespondentClick={openPersonaDetail}
-              onViewDebate={openDebateTranscript}
-            />
+            {isDebate ? (
+              // Debate mode: show thematic analysis
+              debateAnalysis ? (
+                <DebateAnalysisView
+                  analysis={debateAnalysis}
+                  panel={panel}
+                  onRespondentClick={openPersonaDetail}
+                  onViewTranscript={debateMessages.length > 0 ? openLiveDebateTranscript : undefined}
+                />
+              ) : isAnalyzing ? (
+                <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground py-12">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                  <div className="text-center">
+                    <p className="text-sm font-medium">Analyzing debate themes...</p>
+                    <p className="text-xs mt-1">Extracting position clusters from {debateMessages.length} discussion messages</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center text-sm text-muted-foreground py-8">
+                  Analysis will appear here after all debate rounds complete.
+                </div>
+              )
+            ) : (
+              // Survey mode: show charts
+              <ResultsView
+                surveys={visibleSurveys}
+                onHideSurvey={removeSurveyFromResults}
+                onRespondentClick={openPersonaDetail}
+                onViewDebate={openDebateTranscript}
+              />
+            )}
           </TabsContent>
         </Tabs>
       )}
@@ -498,8 +561,6 @@ export function SurveyView() {
           question={debateTranscriptSurvey.question}
           debateMessages={debateTranscriptSurvey.debateMessages ?? []}
           roundSummaries={debateTranscriptSurvey.roundSummaries ?? []}
-          responses={debateTranscriptSurvey.responses}
-          breakdown={debateTranscriptSurvey.breakdown}
           panel={debateTranscriptSurvey.panel}
         />
       )}

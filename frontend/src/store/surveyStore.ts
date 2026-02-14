@@ -3,6 +3,7 @@ import type {
   ApiKeys,
   ChatMode,
   CompletedSurvey,
+  DebateAnalysis,
   DebateMessage,
   QuestionBreakdown,
   Respondent,
@@ -92,6 +93,7 @@ interface SurveyState {
   responses: SurveyResponse[]
   debateMessages: DebateMessage[]
   roundSummaries: RoundSummary[]
+  debateAnalysis: DebateAnalysis | null
   currentRound: number
   totalRounds: number
   error: string | null
@@ -103,6 +105,7 @@ interface SurveyState {
   addResponse: (response: SurveyResponse) => void
   addDebateMessage: (message: DebateMessage) => void
   addRoundSummary: (summary: RoundSummary) => void
+  setDebateAnalysis: (analysis: DebateAnalysis) => void
   setRound: (round: number, totalRounds: number) => void
   setSurveyDone: () => void
   setError: (error: string) => void
@@ -221,6 +224,7 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
   responses: [],
   debateMessages: [],
   roundSummaries: [],
+  debateAnalysis: null,
   currentRound: 0,
   totalRounds: 1,
   error: null,
@@ -236,6 +240,7 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
       responses: [],
       debateMessages: [],
       roundSummaries: [],
+      debateAnalysis: null,
       currentRound: 0,
       totalRounds: 1,
       error: null,
@@ -262,6 +267,9 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
       roundSummaries: [...state.roundSummaries, summary],
     })),
 
+  setDebateAnalysis: (analysis) =>
+    set({ debateAnalysis: analysis }),
+
   setRound: (round, totalRounds) =>
     set({ currentRound: round, totalRounds }),
 
@@ -269,23 +277,26 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
     const state = get()
     const updates: Partial<SurveyState> = { phase: "complete" }
 
-    // Auto-add to completed surveys if we have the required data
-    if (state.surveyId && state.question && state.breakdown) {
+    // Auto-add to completed surveys — debate mode may not have a breakdown
+    const isDebateMode = state.chatMode === "debate"
+    const hasRequiredData = state.surveyId && state.question && (state.breakdown || isDebateMode)
+    if (hasRequiredData) {
       const completed: CompletedSurvey = {
-        id: state.surveyId,
-        question: state.question,
+        id: state.surveyId!,
+        question: state.question!,
         breakdown: state.breakdown,
         responses: state.responses,
         panel: state.panel,
         debateMessages: state.debateMessages.length > 0 ? state.debateMessages : undefined,
         roundSummaries: state.roundSummaries.length > 0 ? state.roundSummaries : undefined,
+        debateAnalysis: state.debateAnalysis ?? undefined,
       }
       updates.completedSurveys = {
         ...state.completedSurveys,
-        [state.surveyId]: completed,
+        [state.surveyId!]: completed,
       }
-      if (!state.visibleSurveyIds.includes(state.surveyId)) {
-        updates.visibleSurveyIds = [...state.visibleSurveyIds, state.surveyId]
+      if (!state.visibleSurveyIds.includes(state.surveyId!)) {
+        updates.visibleSurveyIds = [...state.visibleSurveyIds, state.surveyId!]
       }
     }
 
@@ -306,6 +317,7 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
       responses: [],
       debateMessages: [],
       roundSummaries: [],
+      debateAnalysis: null,
       currentRound: 0,
       totalRounds: 1,
       error: null,

@@ -2,7 +2,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
 
 from backend.graph.state import SurveyState, DebateState
-from backend.graph.nodes import survey_respond, debate_respond, summarize_round
+from backend.graph.nodes import survey_respond, debate_respond, summarize_round, analyze_debate
 from backend.models.respondent import Respondent
 from backend.services.llm import _detect_provider
 
@@ -60,12 +60,11 @@ def build_survey_graph() -> StateGraph:
 # ---------------------------------------------------------------------------
 
 def _debate_fan_out(state: DebateState) -> list[Send]:
-    """Fan out for a debate round (discussion or final vote)."""
+    """Fan out for an open-ended discussion round."""
     panel = state["panel"]
     models = state["models"]
     api_keys = state["api_keys"]
     temperatures = state.get("temperatures", {})
-    sub_questions = state["sub_questions"]
     question = state["question"]
     survey_id = state["survey_id"]
     persona_memory = state.get("persona_memory", True)
@@ -85,7 +84,6 @@ def _debate_fan_out(state: DebateState) -> list[Send]:
             sends.append(Send("debate_respond", {
                 "respondent": respondent_dict,
                 "agent_name": respondent.display_name(),
-                "sub_questions": sub_questions,
                 "question": question,
                 "model": model,
                 "api_key": api_key,
@@ -100,11 +98,12 @@ def _debate_fan_out(state: DebateState) -> list[Send]:
 
 
 def build_debate_graph() -> StateGraph:
-    """Multi-round debate: discussion rounds -> summarize -> loop -> final vote -> END."""
+    """Multi-round debate: discussion -> summarize -> loop -> analyze -> END."""
     graph = StateGraph(DebateState)
 
     graph.add_node("debate_respond", debate_respond)
     graph.add_node("summarize_round", summarize_round)
+    graph.add_node("analyze_debate", analyze_debate)
 
     # START -> fan out for round 1
     graph.add_conditional_edges(START, _debate_fan_out, ["debate_respond"])
@@ -112,16 +111,19 @@ def build_debate_graph() -> StateGraph:
     # All debate responses -> summarize
     graph.add_edge("debate_respond", "summarize_round")
 
-    # After summary: if more rounds needed fan out again, otherwise END
+    # After summary: if more rounds, fan out again; otherwise run analysis
     def _after_summary(state: DebateState) -> list[Send] | str:
         if state["current_round"] > state["num_rounds"]:
-            return END
+            return "analyze_debate"
         return _debate_fan_out(state)
 
     graph.add_conditional_edges(
         "summarize_round",
         _after_summary,
-        ["debate_respond", END],
+        ["debate_respond", "analyze_debate"],
     )
+
+    # Analysis -> END
+    graph.add_edge("analyze_debate", END)
 
     return graph.compile()

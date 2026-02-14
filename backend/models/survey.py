@@ -13,6 +13,25 @@ class QuestionBreakdown(BaseModel):
     sub_questions: list[SubQuestion] = Field(description="1-6 sub-questions with categorical answer options. Use exactly 1 if the input is a single question.")
 
 
+# ---------------------------------------------------------------------------
+# Debate analysis — thematic extraction via structured LLM output
+# ---------------------------------------------------------------------------
+
+class DebateTheme(BaseModel):
+    label: str = Field(description="Short descriptive label for this position cluster, e.g. 'Pro-AI Pragmatists'")
+    description: str = Field(description="2-3 sentence summary of what this group believes and why")
+    respondent_ids: list[int] = Field(description="IDs of respondents who hold this position")
+    key_arguments: list[str] = Field(description="3-5 bullet-point arguments or quotes representative of this cluster")
+    sentiment: str = Field(description="Overall sentiment: 'positive', 'negative', 'mixed', or 'neutral'")
+
+
+class DebateAnalysis(BaseModel):
+    themes: list[DebateTheme] = Field(description="Distinct position clusters identified in the debate, ordered by size (largest first)")
+    consensus_points: list[str] = Field(description="Key points most or all panelists agree on")
+    key_tensions: list[str] = Field(description="Main disagreements or fault lines in the group")
+    synthesis: str = Field(description="3-5 sentence overall synthesis of the debate outcome")
+
+
 class SurveyRequest(BaseModel):
     question: str
     panel_size: int = 5

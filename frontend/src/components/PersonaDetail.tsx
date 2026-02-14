@@ -66,7 +66,7 @@ export function PersonaDetail({
           surveyId: survey.id,
           question: survey.question,
           responses: matching,
-          subQuestions: survey.breakdown.sub_questions,
+          subQuestions: survey.breakdown?.sub_questions ?? [],
         })
       }
     }

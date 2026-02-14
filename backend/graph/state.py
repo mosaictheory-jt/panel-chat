@@ -29,7 +29,6 @@ class SurveyState(TypedDict):
 class DebateAgentState(TypedDict):
     respondent: dict
     agent_name: str
-    sub_questions: list[dict]
     question: str
     model: str
     api_key: str
@@ -43,7 +42,6 @@ class DebateAgentState(TypedDict):
 
 class DebateState(TypedDict):
     question: str
-    sub_questions: list[dict]
     panel: list[dict]
     models: list[str]
     api_keys: dict[str, str]
@@ -53,5 +51,5 @@ class DebateState(TypedDict):
     num_rounds: int
     current_round: int
     prior_round_summary: str
-    responses: Annotated[list[dict], operator.add]
     debate_messages: Annotated[list[dict], operator.add]
+    analysis: dict | None
