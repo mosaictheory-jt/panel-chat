@@ -1,92 +1,75 @@
 # Panel Chat
 
-Chat with AI agents representing 1,136 real survey respondents. Ask a question, select a panel, and watch persona-agents debate across multiple rounds — powered by LangGraph's fan-out/collect pattern.
+AI-powered survey panel that lets you ask questions to persona-agents representing 1,136 real data engineering survey respondents. Questions are broken into structured sub-questions, fanned out to agents in parallel via LangGraph, and responses are automatically visualized with interactive charts.
 
 ## Features
 
-- **Multi-provider LLM support**: Anthropic (Claude), OpenAI (GPT-5.2, o3), Google (Gemini) — bring your own API key
-- **Survey-backed personas**: Each agent is grounded in a real respondent's profile from the 2026 Data Engineering Survey
-- **Multi-round debates**: Agents see prior responses and can refine their positions
-- **Configurable panels**: 2 to 1,136 respondents, filtered by role, industry, region, and more
-- **Real-time streaming**: Responses stream over WebSocket as agents complete
-- **Session history**: Past debates are persisted in DuckDB and browsable from the sidebar
+- **Multi-provider LLM support** — Anthropic (Claude), OpenAI (GPT-5.2, o3), Google (Gemini). Bring your own API keys; nothing is stored server-side.
+- **Survey-backed personas** — Each agent is grounded in a real respondent's profile from the 2026 Data Engineering Survey (role, industry, tools, pain points, etc.)
+- **Structured question analysis** — An LLM analyzer breaks your question into sub-questions with categorical answer options before surveying the panel
+- **Editable breakdown** — Review and modify sub-questions, options, and chart types before running
+- **Multi-model comparison** — Select multiple models and compare how different LLMs answer through the same personas
+- **Real-time streaming** — Responses stream over WebSocket with live panelist status and progressive chart updates
+- **Cost tracking** — Estimated cost shown before running; actual cost (from token usage) shown after completion, broken down by provider
+- **Accumulated results** — Stack results from multiple surveys, toggle visibility, and compare across runs
+- **Interactive charts** — Bar/pie toggle per chart, click-to-drill-down to see which panelists chose an option, chart color theme picker
+- **Persona detail** — Click any panelist to see their full profile and response history across all visible surveys
+- **Light/dark/system theme** — Full theme support with persistent preference
+- **Session history** — Past surveys are persisted in DuckDB and browsable from the sidebar
+- **Docker support** — Single `docker compose up` to run the full stack
 
 ## Quick Start
 
 ### Prerequisites
 
 - Python 3.12+
-- Node.js 18+
+- Node.js 22+
 - [uv](https://docs.astral.sh/uv/) for Python dependency management
 
-### Setup
+### Local Development
 
 ```bash
-# Clone and install backend dependencies
+# Clone and install
 git clone <repo-url> && cd panel-chat
 uv sync
-
-# Install frontend dependencies
 cd frontend && npm install && cd ..
 
-# Copy environment config
-cp .env.example .env
-```
-
-### Run
-
-```bash
-# Terminal 1: Backend
+# Run backend (terminal 1)
 uv run uvicorn backend.main:app --reload
 
-# Terminal 2: Frontend
+# Run frontend (terminal 2)
 cd frontend && npm run dev
 ```
 
-Open http://localhost:5173. The settings modal will appear on first visit — enter your API key, pick a model, and start asking questions.
+Open http://localhost:5173. The settings modal will appear on first visit — enter at least one API key, select models, and start asking questions.
 
-## Configuration
+### Docker
 
-Settings are managed in the browser (no server-side API keys):
-
-| Setting | Description |
-|---------|------------|
-| **API Key** | Your key for the selected provider (stored in localStorage, sent directly to the provider) |
-| **Model** | Claude Opus 4.6, Claude Sonnet 4.5, Claude Haiku 4.5, GPT-5.2, GPT-4.1, GPT-4.1 Mini, o3, o3 Mini, Gemini 2.5 Pro, Gemini 2.5 Flash |
-| **Panel Size** | Number of respondents (2–1,136). Panels >20 show a cost/speed warning |
-| **Rounds** | Number of debate rounds (1–5) |
-| **Filters** | Narrow the panel by role, org size, industry, region, AI usage, architecture trend |
-
-Server-side config (`.env`):
-
-```
-DUCKDB_PATH=panel_chat.duckdb
-CSV_PATH=survey_2026_data_engineering.csv
+```bash
+docker compose up --build
 ```
 
-## Architecture
+Open http://localhost:3000. The nginx frontend proxies API and WebSocket requests to the backend automatically.
 
-```
-backend/                    frontend/src/
-  main.py                     App.tsx
-  config.py                   api/client.ts, ws.ts
-  db.py                       store/debateStore.ts
-  models/                     hooks/useDebate.ts
-  routers/                    components/
-  services/                   components/ui/ (shadcn)
-  graph/                      types/index.ts
-    state.py
-    nodes.py
-    builder.py
-    prompts.py
-```
+## Documentation
 
-**Backend**: FastAPI + LangGraph + DuckDB. The debate graph fans out questions to persona-agents in parallel, collects responses per round, and streams results over WebSocket.
+Detailed documentation is available in the [`docs/`](docs/) folder:
 
-**Frontend**: React 19 + Vite + Tailwind CSS v4 + shadcn/ui + Zustand. Settings modal for API key/model configuration, sidebar with filters and history, real-time debate view.
+| Document | Description |
+|----------|-------------|
+| [Architecture](docs/architecture.md) | System design, data flow, and component interactions |
+| [API Reference](docs/api.md) | REST and WebSocket endpoint documentation |
+| [Configuration](docs/configuration.md) | All settings, environment variables, and deployment options |
+| [Development Guide](docs/development.md) | Local setup, adding features, testing, and conventions |
 
 ## Tech Stack
 
-- **Backend**: Python 3.12, FastAPI, LangGraph, LangChain (Anthropic/OpenAI/Google), DuckDB, Pydantic v2
-- **Frontend**: TypeScript, React 19, Vite 7, Tailwind CSS v4, shadcn/ui, Zustand, Lucide icons
-- **Package management**: uv (Python), npm (frontend)
+| Layer | Technologies |
+|-------|-------------|
+| **Backend** | Python 3.12, FastAPI, LangGraph, LangChain (Anthropic / OpenAI / Google), DuckDB, Pydantic v2 |
+| **Frontend** | TypeScript, React 19, Vite 7, Tailwind CSS v4, shadcn/ui, Zustand, Recharts, Lucide |
+| **Infrastructure** | Docker, nginx, uv, npm |
+
+## License
+
+MIT
