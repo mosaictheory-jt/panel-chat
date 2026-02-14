@@ -40,6 +40,7 @@ export function SurveyView() {
     completedSurveys,
     visibleSurveyIds,
     removeSurveyFromResults,
+    reset,
     chatMode,
     currentRound,
     totalRounds,
@@ -219,6 +220,13 @@ export function SurveyView() {
       setActiveTab("panelists")
     }
   }, [phase === "running"])
+
+  // Reset to blank screen when all visible results are removed and nothing is actively running
+  useEffect(() => {
+    if (phase === "complete" && visibleSurveyIds.length === 0) {
+      reset()
+    }
+  }, [phase, visibleSurveyIds.length, reset])
 
   // Detect debate from either the active chat mode setting OR from loaded historical data
   const isDebate = (chatMode === "debate" && totalRounds > 1) || debateMessages.length > 0 || debateAnalysis !== null
