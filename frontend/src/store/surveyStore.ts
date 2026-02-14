@@ -36,7 +36,7 @@ function loadSelectedModels(): string[] {
   const stored = localStorage.getItem(STORAGE_KEY_MODELS)
   if (stored) {
     try {
-      return JSON.parse(stored)
+      return [...new Set<string>(JSON.parse(stored))]
     } catch {
       return []
     }
@@ -156,8 +156,9 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
   },
 
   setSelectedModels: (models) => {
-    localStorage.setItem(STORAGE_KEY_MODELS, JSON.stringify(models))
-    set({ selectedModels: models })
+    const deduplicated = [...new Set(models)]
+    localStorage.setItem(STORAGE_KEY_MODELS, JSON.stringify(deduplicated))
+    set({ selectedModels: deduplicated })
   },
 
   setAnalyzerModel: (model) => {
