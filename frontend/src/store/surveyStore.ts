@@ -36,7 +36,13 @@ function loadSelectedModels(): string[] {
   const stored = localStorage.getItem(STORAGE_KEY_MODELS)
   if (stored) {
     try {
-      return [...new Set<string>(JSON.parse(stored))]
+      const parsed = [...new Set<string>(JSON.parse(stored))]
+      // Only keep models that have a configured API key
+      const keys = loadApiKeys()
+      return parsed.filter((model) => {
+        const provider = _getProvider(model)
+        return provider ? keys[provider].length > 0 : false
+      })
     } catch {
       return []
     }
@@ -153,9 +159,22 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
       google: STORAGE_KEY_GOOGLE,
     }
     localStorage.setItem(storageMap[provider], key)
-    set((state) => ({
+
+    // When removing a key, deselect any models from that provider
+    const state = get()
+    let updatedModels = state.selectedModels
+    if (key.length === 0) {
+      updatedModels = state.selectedModels.filter((model) => {
+        const modelProvider = _getProvider(model)
+        return modelProvider !== provider
+      })
+      localStorage.setItem(STORAGE_KEY_MODELS, JSON.stringify(updatedModels))
+    }
+
+    set({
       apiKeys: { ...state.apiKeys, [provider]: key },
-    }))
+      selectedModels: updatedModels,
+    })
   },
 
   setSelectedModels: (models) => {
