@@ -55,6 +55,7 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
 
         # Persist chat mode so historical loads know whether this is a survey or debate
         save_chat_mode(survey_id, chat_mode)
+        logger.info("Survey %s: chat_mode=%s, persisted to DB", survey_id, chat_mode)
 
         if chat_mode == "debate":
             graph = build_debate_graph()
@@ -154,6 +155,7 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
                             "token_usage": msg.get("token_usage"),
                         }
                         save_debate_message(survey_id, msg_data)
+                        logger.info("Survey %s: saved debate message from respondent %s round %s", survey_id, msg["respondent_id"], msg["round"])
                         await websocket.send_json({
                             "type": "debate_message",
                             "data": msg_data,
@@ -168,6 +170,7 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
                         "summary": summary,
                     }
                     save_round_summary(survey_id, summary_data)
+                    logger.info("Survey %s: saved round %s summary", survey_id, current_round - 1)
                     await websocket.send_json({
                         "type": "round_complete",
                         "data": summary_data,
@@ -177,6 +180,7 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
                     analysis = node_output.get("analysis")
                     if analysis:
                         save_debate_analysis(survey_id, analysis)
+                        logger.info("Survey %s: saved debate analysis with %d themes", survey_id, len(analysis.get("themes", [])))
                         await websocket.send_json({
                             "type": "debate_analysis",
                             "data": analysis,

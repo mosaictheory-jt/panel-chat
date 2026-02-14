@@ -360,8 +360,11 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
     const state = get()
     const hasDebateData = (debateMessages && debateMessages.length > 0) || debateAnalysis
     const hasResults = responses.length > 0 || hasDebateData
+    // Historical surveys that were set up (have a panel) are treated as complete
+    const isHistoricalWithPanel = panel.length > 0
+
     const updates: Partial<SurveyState> = {
-      phase: hasResults ? "complete" : breakdown ? "reviewing" : "idle",
+      phase: hasResults ? "complete" : breakdown ? "reviewing" : isHistoricalWithPanel ? "complete" : "idle",
       surveyId: id,
       question,
       panel,
@@ -374,8 +377,8 @@ export const useSurveyStore = create<SurveyState>((set, get) => ({
       error: null,
     }
 
-    // Auto-add loaded surveys/debates with results to the accumulated view
-    if ((breakdown && responses.length > 0) || hasDebateData) {
+    // Always add historical surveys with a panel to the accumulated view
+    if (isHistoricalWithPanel) {
       const completed: CompletedSurvey = {
         id,
         question,

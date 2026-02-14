@@ -153,8 +153,31 @@ export function ResultsView({
           )
         }
 
-        // Fallback: survey with no breakdown and no analysis (shouldn't normally happen)
-        return null
+        // Survey with no persisted results (pre-dates data persistence)
+        return (
+          <div key={survey.id} className="space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-sm leading-tight">{survey.question}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {survey.panel.length} panelists
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
+                onClick={() => onHideSurvey?.(survey.id)}
+                title="Hide from results"
+              >
+                <EyeOff className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+            <div className="rounded-lg border border-dashed bg-muted/30 p-6 text-center text-sm text-muted-foreground">
+              Results were not saved for this session. Run a new survey or debate to see persisted results.
+            </div>
+          </div>
+        )
       })}
     </div>
   )

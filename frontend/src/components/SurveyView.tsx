@@ -281,7 +281,7 @@ export function SurveyView() {
     )
   }
 
-  const showTabs = (phase === "running" || phase === "complete") && (breakdown || isDebate)
+  const showTabs = (phase === "running" || phase === "complete") && (breakdown || isDebate || panel.length > 0)
   const uniquePanelistCount = mergedPanelists.length
 
   return (
