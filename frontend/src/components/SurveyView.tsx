@@ -45,8 +45,8 @@ export function SurveyView() {
     currentRound,
     totalRounds,
     debateMessages,
-    roundSummaries,
     debateAnalysis,
+    roundSummaries,
   } = useSurveyStore()
 
   const [selectedRespondent, setSelectedRespondent] = useState<Respondent | null>(null)
@@ -312,7 +312,7 @@ export function SurveyView() {
             )}
             {phase === "complete" && isDebate && debateMessages.length > 0 && (
               <Badge className="text-xs bg-emerald-500/10 text-emerald-700 border-emerald-500/30">
-                {debateMessages.length} messages · {roundSummaries.length} rounds
+                {debateMessages.length} messages
               </Badge>
             )}
             {phase === "complete" && isDebate && debateAnalysis && (debateAnalysis.themes?.length ?? 0) > 0 && (
@@ -526,7 +526,7 @@ export function SurveyView() {
           <div className="text-left flex-1">
             <p className="font-medium">View Debate Transcript</p>
             <p className="text-muted-foreground">
-              {debateMessages.length} discussion messages · {roundSummaries.length} round summaries
+              {debateMessages.length} discussion messages across {totalRounds} round{totalRounds !== 1 ? "s" : ""}
             </p>
           </div>
         </button>

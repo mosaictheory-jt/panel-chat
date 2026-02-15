@@ -37,7 +37,7 @@ class DebateAgentState(TypedDict):
     persona_memory: bool
     round_number: int
     num_rounds: int
-    prior_round_summary: str
+    prior_transcript: str  # full raw transcript of all prior messages
 
 
 class DebateState(TypedDict):
@@ -50,6 +50,5 @@ class DebateState(TypedDict):
     persona_memory: bool
     num_rounds: int
     current_round: int
-    prior_round_summary: str
     debate_messages: Annotated[list[dict], operator.add]
     analysis: dict | None

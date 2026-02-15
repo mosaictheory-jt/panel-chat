@@ -10,7 +10,6 @@ from backend.services.history import (
     get_survey,
     save_response,
     save_debate_message,
-    save_round_summary,
     save_debate_analysis,
     save_chat_mode,
 )
@@ -69,7 +68,6 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
                 "persona_memory": persona_memory,
                 "num_rounds": num_rounds,
                 "current_round": 1,
-                "prior_round_summary": "",
                 "debate_messages": [],
                 "analysis": None,
             }
@@ -161,19 +159,16 @@ async def survey_ws(websocket: WebSocket, survey_id: str):
                             "data": msg_data,
                         })
 
-                elif node_name == "summarize_round":
+                elif node_name == "collect_round":
                     current_round = node_output.get("current_round", 1)
-                    summary = node_output.get("prior_round_summary", "")
-                    summary_data = {
+                    round_data = {
                         "round": current_round - 1,
                         "total_rounds": num_rounds,
-                        "summary": summary,
                     }
-                    save_round_summary(survey_id, summary_data)
-                    logger.info("Survey %s: saved round %s summary", survey_id, current_round - 1)
+                    logger.info("Survey %s: completed round %s", survey_id, current_round - 1)
                     await websocket.send_json({
                         "type": "round_complete",
-                        "data": summary_data,
+                        "data": round_data,
                     })
 
                 elif node_name == "analyze_debate":

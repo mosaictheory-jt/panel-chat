@@ -2,7 +2,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
 
 from backend.graph.state import SurveyState, DebateState
-from backend.graph.nodes import survey_respond, debate_respond, summarize_round, analyze_debate
+from backend.graph.nodes import survey_respond, debate_respond, collect_round, analyze_debate
 from backend.models.respondent import Respondent
 from backend.services.llm import _detect_provider
 
@@ -56,11 +56,25 @@ def build_survey_graph() -> StateGraph:
 
 
 # ---------------------------------------------------------------------------
-# Debate graph: discussion rounds -> summarize -> loop -> final vote -> END
+# Debate graph: discussion rounds -> collect (raw transcript) -> loop -> analyze -> END
 # ---------------------------------------------------------------------------
 
+def _build_raw_transcript(debate_messages: list[dict], up_to_round: int) -> str:
+    """Build the full raw transcript of all debate messages up to (and including) a given round."""
+    transcript_parts: list[str] = []
+    for round_num in range(1, up_to_round + 1):
+        round_msgs = [m for m in debate_messages if m.get("round") == round_num]
+        if not round_msgs:
+            continue
+        transcript_parts.append(f"--- Round {round_num} ---")
+        for msg in round_msgs:
+            transcript_parts.append(f"{msg['agent_name']}: {msg['text']}")
+        transcript_parts.append("")
+    return "\n".join(transcript_parts).strip()
+
+
 def _debate_fan_out(state: DebateState) -> list[Send]:
-    """Fan out for an open-ended discussion round."""
+    """Fan out for an open-ended discussion round, passing full raw transcript."""
     panel = state["panel"]
     models = state["models"]
     api_keys = state["api_keys"]
@@ -70,7 +84,10 @@ def _debate_fan_out(state: DebateState) -> list[Send]:
     persona_memory = state.get("persona_memory", True)
     current_round = state["current_round"]
     num_rounds = state["num_rounds"]
-    prior_round_summary = state.get("prior_round_summary", "")
+    debate_messages = state.get("debate_messages", [])
+
+    # Build the raw transcript of all prior rounds
+    prior_transcript = _build_raw_transcript(debate_messages, current_round - 1)
 
     sends = []
     for respondent_dict in panel:
@@ -92,34 +109,34 @@ def _debate_fan_out(state: DebateState) -> list[Send]:
                 "persona_memory": persona_memory,
                 "round_number": current_round,
                 "num_rounds": num_rounds,
-                "prior_round_summary": prior_round_summary,
+                "prior_transcript": prior_transcript,
             }))
     return sends
 
 
 def build_debate_graph() -> StateGraph:
-    """Multi-round debate: discussion -> summarize -> loop -> analyze -> END."""
+    """Multi-round debate: discussion -> collect -> loop -> analyze -> END."""
     graph = StateGraph(DebateState)
 
     graph.add_node("debate_respond", debate_respond)
-    graph.add_node("summarize_round", summarize_round)
+    graph.add_node("collect_round", collect_round)
     graph.add_node("analyze_debate", analyze_debate)
 
     # START -> fan out for round 1
     graph.add_conditional_edges(START, _debate_fan_out, ["debate_respond"])
 
-    # All debate responses -> summarize
-    graph.add_edge("debate_respond", "summarize_round")
+    # All debate responses -> collect (increments round counter)
+    graph.add_edge("debate_respond", "collect_round")
 
-    # After summary: if more rounds, fan out again; otherwise run analysis
-    def _after_summary(state: DebateState) -> list[Send] | str:
+    # After collect: if more rounds, fan out again; otherwise run analysis
+    def _after_collect(state: DebateState) -> list[Send] | str:
         if state["current_round"] > state["num_rounds"]:
             return "analyze_debate"
         return _debate_fan_out(state)
 
     graph.add_conditional_edges(
-        "summarize_round",
-        _after_summary,
+        "collect_round",
+        _after_collect,
         ["debate_respond", "analyze_debate"],
     )
 

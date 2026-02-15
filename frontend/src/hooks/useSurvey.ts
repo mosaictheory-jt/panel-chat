@@ -56,8 +56,6 @@ export function useSurvey() {
             case "round_complete": {
               const round = msg.data.round as number
               const totalRounds = msg.data.total_rounds as number
-              const summary = msg.data.summary as string
-              store.addRoundSummary({ round, totalRounds, summary })
               store.setRound(round + 1, totalRounds)
               break
             }

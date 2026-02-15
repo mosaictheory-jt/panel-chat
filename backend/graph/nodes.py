@@ -9,8 +9,6 @@ from backend.graph.prompts import (
     SURVEY_USER,
     DEBATE_DISCUSS_USER,
     DEBATE_DISCUSS_FOLLOWUP_USER,
-    DEBATE_SUMMARY_SYSTEM,
-    DEBATE_SUMMARY_USER,
     DEBATE_ANALYSIS_SYSTEM,
     DEBATE_ANALYSIS_USER,
 )
@@ -226,11 +224,11 @@ def debate_respond(state: DebateAgentState) -> dict:
     persona_memory = state.get("persona_memory", True)
     round_number = state["round_number"]
     num_rounds = state["num_rounds"]
-    prior_round_summary = state.get("prior_round_summary", "")
+    prior_transcript = state.get("prior_transcript", "")
 
     system_prompt = _build_system_prompt(respondent, survey_id, persona_memory)
 
-    if round_number == 1 or not prior_round_summary:
+    if round_number == 1 or not prior_transcript:
         user_prompt = DEBATE_DISCUSS_USER.format(
             question=question,
             round_number=round_number,
@@ -241,7 +239,7 @@ def debate_respond(state: DebateAgentState) -> dict:
             question=question,
             round_number=round_number,
             num_rounds=num_rounds,
-            prior_round_summary=prior_round_summary,
+            prior_transcript=prior_transcript,
         )
 
     llm = get_llm(model, api_key, temperature=temperature)
@@ -264,39 +262,23 @@ def debate_respond(state: DebateAgentState) -> dict:
     }
 
 
-def summarize_round(state: DebateState) -> dict:
-    """After a discussion round, summarize the open-ended responses for the next round."""
+def collect_round(state: DebateState) -> dict:
+    """After a discussion round, build the raw transcript for the next round. No synthesis."""
     debate_messages = state.get("debate_messages", [])
-    question = state["question"]
     current_round = state["current_round"]
 
-    round_messages = [m for m in debate_messages if m.get("round") == current_round]
-
-    response_lines = []
-    for msg in round_messages:
-        response_lines.append(f"**{msg['agent_name']}**: {msg['text']}")
-    responses_text = "\n\n".join(response_lines) if response_lines else "No responses received."
-
-    llm = _get_summary_llm(state)
-    if not llm:
-        logger.error("No model with a valid API key available for summarization")
-        return {
-            "prior_round_summary": "Unable to generate summary — no API key available.",
-            "current_round": current_round + 1,
-        }
-
-    response = llm.invoke([
-        SystemMessage(content=DEBATE_SUMMARY_SYSTEM),
-        HumanMessage(content=DEBATE_SUMMARY_USER.format(
-            question=question,
-            round_number=current_round,
-            total_respondents=len(round_messages),
-            responses_text=responses_text,
-        )),
-    ])
+    # Build full raw transcript of all messages so far, organized by round
+    transcript_parts: list[str] = []
+    for round_num in range(1, current_round + 1):
+        round_msgs = [m for m in debate_messages if m.get("round") == round_num]
+        if not round_msgs:
+            continue
+        transcript_parts.append(f"--- Round {round_num} ---")
+        for msg in round_msgs:
+            transcript_parts.append(f"{msg['agent_name']}: {msg['text']}")
+        transcript_parts.append("")
 
     return {
-        "prior_round_summary": response.content.strip(),
         "current_round": current_round + 1,
     }
 

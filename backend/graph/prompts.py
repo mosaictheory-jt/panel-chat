@@ -70,28 +70,11 @@ DEBATE_DISCUSS_FOLLOWUP_USER = """You're in Round {round_number} of {num_rounds}
 
 "{question}"
 
-Here's what emerged from the group's discussion so far:
+Here is what everyone has said so far:
 
-{prior_round_summary}
+{prior_transcript}
 
-Now respond. You may hold your position, shift it, or refine it. In 2-4 sentences, share where you stand now and why. Reference what others said if it influenced your thinking. Be direct."""
-
-DEBATE_SUMMARY_SYSTEM = """You are a neutral moderator summarizing a panel debate round. Be concise but capture the key positions, points of agreement, and tensions. Include counts where relevant."""
-
-DEBATE_SUMMARY_USER = """Summarize Round {round_number} of this debate.
-
-Question: "{question}"
-
-{total_respondents} panelists shared their views. Here are their responses:
-
-{responses_text}
-
-Write a 3-5 sentence summary that:
-1. Captures the main positions and how many people hold each
-2. Highlights points of agreement and tension
-3. Notes any compelling arguments or strong stances
-
-This summary will be shown to panelists before the next round to inform their thinking."""
+Now respond. You've heard what others think — you may hold your position, shift it, or refine it. In 2-4 sentences, share where you stand now and why. Engage with specific points others made. Be direct."""
 
 # ---------------------------------------------------------------------------
 # Debate analysis — final thematic extraction after all discussion rounds
